@@ -1,5 +1,16 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '料号总数量': ['Total unique parts', 'รหัสวัสดุทั้งหมด'],
+  'BOM料号数量': ['BOM unique parts', 'รหัสวัสดุ BOM'],
+  'SMT站位表料号数量': ['SMT unique parts', 'รหัสวัสดุ SMT'],
+  '料号数按去重统计，含已排除和候选料；总数为 BOM 与 SMT 并集，A+B 相同料号只计一次，空料号不计。': [
+    'Unique part counts include excluded and candidate rows. Total is the BOM/SMT union; A+B duplicates count once. Blank part numbers are omitted.',
+    'นับรหัสวัสดุไม่ซ้ำ รวมรายการที่ยกเว้นและวัสดุทางเลือก ยอดรวมคือรหัสทั้งหมดจาก BOM และ SMT รหัสซ้ำใน A+B นับครั้งเดียว ไม่นับรหัสว่าง',
+  ],
+  '已排除物料': ['Excluded materials', 'วัสดุที่ยกเว้น'],
+  'BOM插件位置': ['BOM positions', 'ตำแหน่ง BOM'],
+  'SMT站位表位号': ['SMT references', 'ตำแหน่ง SMT'],
+  '命中排除关键词': ['Matched exclusion keywords', 'คำสำคัญที่ตรงกับกฎยกเว้น'],
   'Excel 工作簿': ['Excel workbook', 'สมุดงาน Excel'],
   '导入': ['Import', 'นำเข้า'],
   '保存': ['Save', 'บันทึก'],

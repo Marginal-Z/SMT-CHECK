@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:smt_check/app.dart';
 import 'package:smt_check/core/models.dart';
+import 'package:smt_check/l10n/localization.dart';
+import 'package:smt_check/ui/results.dart';
 
 import 'checker_test.dart' as fixture;
 
@@ -81,4 +83,77 @@ void main() {
     expect(report.count(CheckStatus.pass), 2);
     expect(tester.takeException(), isNull);
   });
+  for (final language in ['zh', 'en', 'th']) {
+    testWidgets(
+      'counts, source positions and excluded materials are visible in $language',
+      (tester) async {
+        tester.view.physicalSize = const Size(1560, 1000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final report = fixture.check(
+          [
+            fixture.row('MATCH', '2', 'R1,R2'),
+            fixture.row(
+              'PASTE',
+              '.2',
+              '原始位置',
+              desc: '锡膏 原始描述',
+              importIssues: ['数量 含 Excel 错误值 #VALUE!'],
+            ),
+          ],
+          [fixture.row('MATCH', '2', 'R2 R1'), fixture.row('EXTRA', '1', 'C5')],
+        );
+        await tester.pumpWidget(
+          SmtCheckApp(
+            persist: false,
+            initialLanguage: language,
+            initialReport: report,
+          ),
+        );
+        await tester.pumpAndSettle();
+        for (final (label, count) in [
+          ('料号总数量', '3'),
+          ('BOM料号数量', '2'),
+          ('SMT站位表料号数量', '2'),
+        ]) {
+          final stat = find.byKey(ValueKey('stat-$label'));
+          expect(
+            find.descendant(
+              of: stat,
+              matching: find.text(translate(label, language)),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: stat, matching: find.text(count)),
+            findsOneWidget,
+          );
+        }
+        expect(find.text(translate('BOM插件位置', language)), findsOneWidget);
+        expect(find.text(translate('SMT站位表位号', language)), findsOneWidget);
+        expect(find.text('R1,R2'), findsOneWidget);
+        expect(find.text('R2 R1'), findsOneWidget);
+        await tester.tap(find.text('${translate('已排除物料', language)} (1)'));
+        await tester.pumpAndSettle();
+        expect(find.text('PASTE'), findsOneWidget);
+        expect(find.text('MATCH'), findsNothing);
+        expect(find.text('EXTRA'), findsNothing);
+        expect(find.text('锡膏 原始描述'), findsOneWidget);
+        expect(find.text('原始位置'), findsOneWidget);
+        final horizontal = find.descendant(
+          of: find.byType(ResultsView),
+          matching: find.byWidgetPredicate(
+            (w) =>
+                w is SingleChildScrollView &&
+                w.scrollDirection == Axis.horizontal,
+          ),
+        );
+        await tester.drag(horizontal, const Offset(-900, 0));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('#VALUE!'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }

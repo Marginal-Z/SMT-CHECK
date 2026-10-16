@@ -1,3 +1,5 @@
+import 'positions.dart';
+
 enum InputKind { bom, station }
 
 class MaterialRow {
@@ -75,22 +77,32 @@ class CheckRules {
     this.excludeEnabled = true,
     this.keywords = const ['锡膏', 'PCB', '助焊剂', '包装材料', '高温贴纸', '碳带'],
   });
-  String? exclusion(MaterialRow row) {
-    if (row.quantity == 0 && row.positionsText.trim().isEmpty) {
-      return '零用量且无插件位置的总成/占位记录';
-    }
-    if (!excludeEnabled) return null;
+  List<String> matchedKeywords(MaterialRow row) {
+    if (!excludeEnabled) return const [];
     final description = row.description.toUpperCase().replaceAll(
       RegExp(r'\s'),
       '',
     );
-    for (final key in keywords) {
-      if (key.trim().isNotEmpty &&
-          description.contains(
-            key.trim().toUpperCase().replaceAll(RegExp(r'\s'), ''),
-          )) {
-        return '品名/物料描述命中排除关键词「${key.trim()}」';
-      }
+    return keywords
+        .map((key) => key.trim())
+        .where(
+          (key) =>
+              key.isNotEmpty &&
+              description.contains(
+                key.toUpperCase().replaceAll(RegExp(r'\s'), ''),
+              ),
+        )
+        .toSet()
+        .toList();
+  }
+
+  String? exclusion(MaterialRow row) {
+    final matched = matchedKeywords(row);
+    if (matched.isNotEmpty) {
+      return '品名/物料描述命中排除关键词「${matched.join('、')}」';
+    }
+    if (row.quantity == 0 && row.positionsText.trim().isEmpty) {
+      return '零用量且无插件位置的总成/占位记录';
     }
     return null;
   }
@@ -107,7 +119,10 @@ class CheckItem {
   final String part;
   final CheckStatus status;
   final List<MaterialRow> bom, smt;
-  final List<String> reasons, missingPositions, extraPositions;
+  final List<String> reasons,
+      missingPositions,
+      extraPositions,
+      excludedKeywords;
   const CheckItem({
     required this.part,
     required this.status,
@@ -116,6 +131,7 @@ class CheckItem {
     required this.reasons,
     this.missingPositions = const [],
     this.extraPositions = const [],
+    this.excludedKeywords = const [],
   });
   double? total(List<MaterialRow> rows) =>
       rows.isEmpty || rows.any((r) => r.quantity == null)
@@ -123,6 +139,9 @@ class CheckItem {
       : rows.fold<double>(0, (v, r) => v + r.quantity!);
   double? get bomQuantity => total(bom);
   double? get smtQuantity => total(smt);
+  // Keep source spelling, separators, line breaks and A+B row order intact.
+  String get bomPositions => bom.map((r) => r.positionsText).join('\n');
+  String get smtPositions => smt.map((r) => r.positionsText).join('\n');
   String get description => (bom.isNotEmpty ? bom : smt).first.description;
   String get label => switch (status) {
     CheckStatus.pass => '一致',
@@ -136,6 +155,9 @@ class CheckItem {
     'label': label,
     'bomQuantity': bomQuantity,
     'smtQuantity': smtQuantity,
+    'bomPositions': bomPositions,
+    'smtPositions': smtPositions,
+    'excludedKeywords': excludedKeywords,
     'reasons': reasons,
     'missingPositions': missingPositions,
     'extraPositions': extraPositions,
@@ -154,14 +176,29 @@ class CheckReport {
     : created = DateTime.now();
   int count(CheckStatus status) =>
       items.where((i) => i.status == status).length;
+  Set<String> _parts(InputKind? kind) => files
+      .where((f) => kind == null || f.kind == kind)
+      .expand((f) => f.rows)
+      .map((r) => normalizePart(r.part))
+      .where((part) => part.isNotEmpty)
+      .toSet();
+  int get totalPartCount => _parts(null).length;
+  int get bomPartCount => _parts(InputKind.bom).length;
+  int get smtPartCount => _parts(InputKind.station).length;
   List<CheckItem> get errors =>
       items.where((i) => i.status == CheckStatus.error).toList();
   Map<String, dynamic> toJson() => {
-    'version': 1,
+    'version': 2,
     'created': created.toIso8601String(),
     'mode': merged ? 'A+B合并' : '单站位表（与完整BOM比较）',
     'rules': rules.toJson(),
-    'summary': {for (final s in CheckStatus.values) s.name: count(s)},
+    'summary': {
+      'totalPartCount': totalPartCount,
+      'bomPartCount': bomPartCount,
+      'smtPartCount': smtPartCount,
+      'partCountBasis': 'unique normalized nonempty part numbers from all imported rows, including excluded and candidate rows; total is BOM/SMT union',
+      for (final s in CheckStatus.values) s.name: count(s),
+    },
     'files': files
         .map((f) => {'name': f.name, 'mappings': f.mappings, 'notes': f.notes})
         .toList(),

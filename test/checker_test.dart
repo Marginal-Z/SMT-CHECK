@@ -12,6 +12,7 @@ MaterialRow row(
   int line = 2,
   String file = 'input.xlsx',
   bool candidate = false,
+  List<String> importIssues = const [],
 }) => MaterialRow(
   part: part,
   description: desc,
@@ -21,6 +22,7 @@ MaterialRow row(
   sheet: 'Sheet',
   row: line,
   candidate: candidate,
+  importIssues: importIssues,
 );
 ImportedFile input(
   List<MaterialRow> rows, {
@@ -34,6 +36,81 @@ CheckReport check(
 }) => Checker().run(input(b, bom: true), [input(s)], rules);
 
 void main() {
+  test('part counts use the BOM/SMT union, deduplicate A+B and include audited rows', () {
+    final report = Checker().run(
+      input([
+        row(' a ', '1', 'R1'),
+        row('A', '1', 'R2'),
+        row('BOM-ONLY', '1', 'C1'),
+        row('PASTE', '0', '', desc: '锡膏'),
+        row('  ', '1', 'C2'),
+      ], bom: true),
+      [
+        input([
+          row('A', '1', 'R1'),
+          row('ALT', '', '', candidate: true),
+          row('SMT-ONLY', '1', 'R3'),
+        ], path: 'a.xlsx'),
+        input([
+          row('a', '1', 'R2'),
+          row('ALT', '', '', candidate: true),
+          row('PASTE', '.5', '', desc: '锡膏'),
+        ], path: 'b.xlsx'),
+      ],
+      const CheckRules(),
+    );
+    expect(report.bomPartCount, 3);
+    expect(report.smtPartCount, 4);
+    expect(report.totalPartCount, 5);
+    expect(report.count(CheckStatus.excluded), 2);
+    expect(report.count(CheckStatus.candidate), 2);
+    final item = report.items.firstWhere((i) => i.part == 'A');
+    expect(item.bomPositions, 'R1\nR2');
+    expect(item.smtPositions, 'R1\nR2');
+    final summary = report.toJson()['summary'] as Map;
+    expect(summary['totalPartCount'], 5);
+    expect(summary['bomPartCount'], 3);
+    expect(summary['smtPartCount'], 4);
+    expect(
+      ReportExport.csv(report),
+      contains('"料号总数量","5","BOM料号数量","3","SMT站位表料号数量","4"'),
+    );
+  });
+  test('keyword exclusions take priority and preserve all matches and import issues on both sources', () {
+    final report = check(
+      [
+        row(
+          'BOARD',
+          '',
+          '原始位号',
+          desc: 'P C B 包装材料',
+          importIssues: ['数量 含 Excel 错误值 #VALUE!'],
+        ),
+      ],
+      [row('BOARD', '0', '', desc: 'pcb 包装材料', candidate: true)],
+    );
+    expect(report.errors, isEmpty);
+    expect(report.count(CheckStatus.excluded), 2);
+    expect(report.count(CheckStatus.candidate), 0);
+    for (final item in report.items) {
+      expect(item.excludedKeywords, ['PCB', '包装材料']);
+      expect(item.reasons.first, contains('PCB、包装材料'));
+    }
+    final bom = report.items.firstWhere((i) => i.bom.isNotEmpty);
+    expect(
+      bom.reasons.last,
+      contains('input.xlsx 第 2 行：数量 含 Excel 错误值 #VALUE!'),
+    );
+    expect(bom.bomPositions, '原始位号');
+    expect(bom.toJson()['excludedKeywords'], ['PCB', '包装材料']);
+    final disabled = check(
+      bom.bom,
+      [],
+      rules: const CheckRules(excludeEnabled: false),
+    );
+    expect(disabled.errors, hasLength(1));
+    expect(disabled.count(CheckStatus.excluded), 0);
+  });
   test(
     'A+B aggregates shared parts and positions without counting candidates',
     () {

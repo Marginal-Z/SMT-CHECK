@@ -59,11 +59,11 @@ class _ResultsViewState extends State<ResultsView> {
               ('全部', null),
               ('异常', CheckStatus.error),
               ('一致', CheckStatus.pass),
-              ('已排除', CheckStatus.excluded),
+              ('已排除物料', CheckStatus.excluded),
               ('候选料', CheckStatus.candidate),
             ])
               DeskButton(
-                label,
+                '${localText(context, label)} (${status == null ? widget.report.items.length : widget.report.count(status)})',
                 selected: filter == status,
                 onPressed: () => setState(() => filter = status),
               ),
@@ -114,7 +114,7 @@ class _ResultsViewState extends State<ResultsView> {
                           controller: horizontal,
                           scrollDirection: Axis.horizontal,
                           child: SizedBox(
-                            width: 1120,
+                            width: 1524,
                             child: Column(
                               children: [
                                 Container(
@@ -126,6 +126,8 @@ class _ResultsViewState extends State<ResultsView> {
                                     '品名 / 物料描述',
                                     'BOM数量',
                                     'SMT数量',
+                                    'BOM插件位置',
+                                    'SMT站位表位号',
                                     '核对结果 / 异常原因',
                                   ], header: true),
                                 ),
@@ -218,6 +220,8 @@ class _ResultsViewState extends State<ResultsView> {
                                                       numberText(
                                                         item.smtQuantity,
                                                       ),
+                                                      item.bomPositions,
+                                                      item.smtPositions,
                                                       item.reasons
                                                           .map(
                                                             (r) => localText(
@@ -242,26 +246,16 @@ class _ResultsViewState extends State<ResultsView> {
                       ),
                     ),
                   ),
-                  if (showDetail) ...[
+                  if (showDetail && widget.selected != null) ...[
                     const SizedBox(width: 14),
                     SizedBox(
                       width: 340,
                       child: Pane(
                         padding: EdgeInsets.zero,
-                        child: widget.selected == null
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(22),
-                                  child: caption(
-                                    context,
-                                    '选择左侧一条物料，查看字段对照、异常原因和原文件证据。',
-                                  ),
-                                ),
-                              )
-                            : ItemDetail(
-                                item: widget.selected!,
-                                onAi: widget.onAi,
-                              ),
+                        child: ItemDetail(
+                          item: widget.selected!,
+                          onAi: widget.onAi,
+                        ),
                       ),
                     ),
                   ],
@@ -285,7 +279,7 @@ class _ResultsViewState extends State<ResultsView> {
     bool header = false,
     Color? color,
   }) {
-    const widths = [77.0, 190.0, 270.0, 80.0, 80.0, 417.0];
+    const widths = [78.0, 180.0, 230.0, 85.0, 85.0, 220.0, 220.0, 420.0];
     return Row(
       children: [
         for (var i = 0; i < values.length; i++)
@@ -352,6 +346,18 @@ class ItemDetail extends StatelessWidget {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 18),
+          if (item.excludedKeywords.isNotEmpty) ...[
+            const LText(
+              '命中排除关键词',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            SelectableText(
+              item.excludedKeywords.join('、'),
+              style: const TextStyle(fontSize: 12),
+            ),
+            const SizedBox(height: 18),
+          ],
           const LText(
             '核对原因',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),

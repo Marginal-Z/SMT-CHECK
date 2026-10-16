@@ -593,7 +593,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                                 ),
                               ),
                               const LText(
-                                'SMT-CHECK  1.1',
+                                'SMT-CHECK  1.2',
                                 style: TextStyle(fontSize: 10),
                               ),
                             ],
@@ -845,60 +845,102 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         ),
     ],
   );
-  Widget workspace(BuildContext context) => Column(
+  Widget workspace(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: (constraints.maxHeight - 300).clamp(
+              0.0,
+              constraints.maxHeight,
+            ),
+          ),
+          child: SingleChildScrollView(child: workspaceHeader(context)),
+        ),
+        Expanded(
+          child: report == null
+              ? emptyState(context)
+              : ResultsView(
+                  report: report!,
+                  selected: selected,
+                  onSelect: (i) => setState(() => selected = i),
+                  onAi: aiBusy ? null : (item) => askAi(item: item),
+                  onExport: (json) => export(json),
+                ),
+        ),
+      ],
+    ),
+  );
+  Widget workspaceHeader(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
       importBar(context),
       const SizedBox(height: 18),
-      if (report == null)
-        Expanded(child: emptyState(context))
-      else ...[
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
+      if (report != null) ...[
+        Row(
           children: [
-            stat(
-              context,
-              '一致料号',
-              report!.count(CheckStatus.pass).toString(),
-              good,
+            Expanded(
+              child: stat(
+                context,
+                '料号总数量',
+                report!.totalPartCount.toString(),
+                null,
+              ),
             ),
-            stat(
-              context,
-              '异常料号',
-              report!.count(CheckStatus.error).toString(),
-              bad,
+            const SizedBox(width: 8),
+            Expanded(
+              child: stat(
+                context,
+                'BOM料号数量',
+                report!.bomPartCount.toString(),
+                null,
+              ),
             ),
-            stat(
-              context,
-              '排除记录',
-              report!.count(CheckStatus.excluded).toString(),
-              null,
-            ),
-            stat(
-              context,
-              '候选料记录',
-              report!.count(CheckStatus.candidate).toString(),
-              null,
+            const SizedBox(width: 8),
+            Expanded(
+              child: stat(
+                context,
+                'SMT站位表料号数量',
+                report!.smtPartCount.toString(),
+                null,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        Expanded(
-          child: ResultsView(
-            report: report!,
-            selected: selected,
-            onSelect: (i) => setState(() => selected = i),
-            onAi: aiBusy ? null : (item) => askAi(item: item),
-            onExport: (json) => export(json),
-          ),
+        const SizedBox(height: 8),
+        caption(
+          context,
+          '料号数按去重统计，含已排除和候选料；总数为 BOM 与 SMT 并集，A+B 相同料号只计一次，空料号不计。',
         ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 20,
+          runSpacing: 6,
+          children: [
+            for (final (label, status, color) in [
+              ('一致料号', CheckStatus.pass, good),
+              ('异常料号', CheckStatus.error, bad),
+              ('排除记录', CheckStatus.excluded, Palette.of(context).muted),
+              ('候选料记录', CheckStatus.candidate, Palette.of(context).muted),
+            ])
+              LText(
+                '${localText(context, label)}  ${report!.count(status)}',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
       ],
     ],
   );
   Widget stat(BuildContext context, String label, String value, Color? color) =>
-      SizedBox(
-        width: 155,
+      Container(
+        key: ValueKey('stat-$label'),
         child: Pane(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Row(
