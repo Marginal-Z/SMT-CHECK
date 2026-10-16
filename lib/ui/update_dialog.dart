@@ -15,12 +15,14 @@ class UpdateDialog extends StatefulWidget {
   final Future<String> Function()? versionLoader;
   final Future<bool> Function(Uri)? linkOpener;
   final String? platform;
+  final String? architecture;
   const UpdateDialog({
     super.key,
     this.serviceFactory,
     this.versionLoader,
     this.linkOpener,
     this.platform,
+    this.architecture,
   });
   @override
   State<UpdateDialog> createState() => _UpdateDialogState();
@@ -59,6 +61,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       final result = await request.check(
         currentVersion: version,
         platform: platform,
+        architecture: widget.architecture ?? currentArchitecture,
       );
       if (mounted) setState(() => release = result);
     } catch (e) {
@@ -148,6 +151,16 @@ class _UpdateDialogState extends State<UpdateDialog> {
               const SizedBox(height: 12),
               if (currentVersion.isNotEmpty)
                 caption(context, '当前版本：$currentVersion'),
+              caption(
+                context,
+                '${platform == 'macos'
+                    ? 'macOS'
+                    : platform == 'windows'
+                    ? 'Windows'
+                    : platform == 'linux'
+                    ? 'Linux'
+                    : platform} · ${widget.architecture ?? currentArchitecture}',
+              ),
               const SizedBox(height: 10),
               if (checking) ...[
                 const LText(
@@ -229,7 +242,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
                       result.hasUpdate &&
                       result.installer != null)
                     DeskButton(
-                      platform == 'windows' ? '下载 Windows 安装包' : '下载 Linux 安装包',
+                      switch (platform) {
+                        'windows' => '下载 Windows 安装包',
+                        'macos' => '下载 macOS 安装包',
+                        _ => '下载 Linux 安装包',
+                      },
                       primary: true,
                       icon: Icons.download_outlined,
                       onPressed: opening

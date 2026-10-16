@@ -1,11 +1,28 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
 
 import 'package:http/http.dart' as http;
 import 'package:pub_semver/pub_semver.dart';
 
 const releaseRepository = 'https://github.com/Marginal-Z/SMT-CHECK';
 final releasesPage = Uri.parse('$releaseRepository/releases/latest');
+
+String get currentArchitecture => switch (Abi.current()) {
+  Abi.windowsX64 || Abi.linuxX64 || Abi.macosX64 => 'x64',
+  Abi.windowsArm64 || Abi.linuxArm64 || Abi.macosArm64 => 'arm64',
+  _ => 'unknown',
+};
+
+String? installerFilename(String platform, String architecture) =>
+    switch ((platform, architecture)) {
+      ('windows', 'x64') => 'SMT-CHECK-Setup-x64.exe',
+      ('windows', 'arm64') => 'SMT-CHECK-Setup-arm64.exe',
+      ('linux', 'x64') => 'SMT-CHECK-linux-amd64.deb',
+      ('linux', 'arm64') => 'SMT-CHECK-linux-arm64.deb',
+      ('macos', 'x64' || 'arm64') => 'SMT-CHECK-macos-universal.dmg',
+      _ => null,
+    };
 
 class UpdateException implements Exception {
   final String message;
@@ -43,6 +60,7 @@ class UpdateService {
   Future<AppRelease> check({
     required String currentVersion,
     required String platform,
+    String? architecture,
   }) async {
     final Version current;
     try {
@@ -91,11 +109,10 @@ class UpdateService {
       final page = Uri.parse(
         '$releaseRepository/releases/tag/${Uri.encodeComponent(tag)}',
       );
-      final filename = switch (platform) {
-        'windows' => 'SMT-CHECK-Setup-x64.exe',
-        'linux' => 'SMT-CHECK-linux-amd64.deb',
-        _ => null,
-      };
+      final filename = installerFilename(
+        platform,
+        architecture ?? currentArchitecture,
+      );
       Uri? installer;
       if (filename != null) {
         final expected = Uri.parse(

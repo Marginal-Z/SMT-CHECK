@@ -8,12 +8,12 @@
 
 - 单站位表核对；A+B 合并核对。
 - 保留系统窗口标题栏的应用图标与名称，内容区直接显示导航，避免重复标识。
-- 右上角“检查更新”手动查询 GitHub 最新正式版本，显示当前版本、更新说明及 Windows / Linux 安装包下载入口。版本从已安装程序读取；超时、网络错误及 GitHub 限流均可重试，不会误报已是最新。使用系统浏览器下载完整安装包，不会发送 Excel、AI 配置或密钥。
+- “设置 → 关于与更新 → 检查更新”手动查询 GitHub 最新正式版本，显示当前版本、更新说明及 按操作系统及当前程序架构匹配的 Windows / Linux / macOS 安装包下载入口。版本从已安装程序读取；超时、网络错误及 GitHub 限流均可重试，不会误报已是最新。使用系统浏览器下载完整安装包，不会发送 Excel、AI 配置或密钥。
 - 自动定位工作表和四个必需表头，保持原文件只读。
 - 字段对应：料件编号 ↔ 料号，品名 ↔ 物料描述，组成用量 ↔ 数量，插件位置 ↔ 位号。
 - 同料号跨行、跨面汇总，双向报告缺料、多料、描述差异、数量差异、位号缺失/多出、重复位号及归属冲突。
 - 核对状态、筛选及导出统一使用 PASS / NG。PASS 为绿色；NG、已排除物料及候选料使用红色行底和实色状态标记，各自类别和统计保持独立。详情原因使用鲜红色文字。主题色不会改变状态含义，可按状态、料号、位号及原因搜索。
-- 在“设置 → 导入与规则”维护排除关键词并查看导入审计；工作台保留原文件导入按钮。设置内另有“外观与 AI 接口”，顶部导航为核对工作台、AI 分析核对、设置和使用说明。
+- 在“设置 → 导入与规则”维护排除关键词并查看导入审计；工作台保留原文件导入按钮。设置内另有“关于与更新”和“外观与 AI 接口”，顶部导航为核对工作台、AI 分析核对、设置和使用说明。
 - 在“设置 → 外观 → 主题色”选择黑色、蓝色或绿色，即时生效并保存选择，不清除已导入文件、核对报告及 AI 分析。
 - 使用用户指定的芯片 / 对勾圆角矩形图标，四角透明，覆盖应用顶栏、Windows 程序与安装向导、Linux 菜单图标和 macOS 运行器图标资源。图稿处理与格式转换说明见 [APP-ICON.md](docs/APP-ICON.md)。
 - 顶部显示料号总数量、BOM 料号数量和 SMT 站位表料号数量。按去掉首尾空白、统一大小写后的非空料号去重，包含已排除和候选料；总数量为 BOM 与 SMT 的并集，A+B 重复料号只计一次，不等同于贴装用量或结果记录数。
@@ -23,8 +23,8 @@
 - 每个结果保留原始字段、工作表、行号、站位和 A/B 来源。
 - NG 结果提供“查看具体差异”入口，在详情中按料号、描述、数量、位号并列显示 BOM / SMT 原值与来源。描述变化片段和缺失 / 多出位号标红，数量明确说明 SMT 比 BOM 多或少多少；同一位号对应不同料号时同时列出两侧料号，不自动认定为替代料。
 - 描述仅忽略大小写和空白，原文不被修改。多行描述冲突会列出全部描述及原始行，避免随意一一配对；CSV 的“字段差异”和 JSON 的 `fieldDifferences` 同步保留原值、差异原因、标红片段及来源。
-- 可编辑关键词排除非贴片物料，逐条记录排除原因。默认：锡膏、PCB、助焊剂、包装材料、高温贴纸、碳带。
-- 所有命中关键词的来源行直接列入“已排除物料”，保留全部命中词及导入问题，不计入一致数；同料号未命中规则的其他行仍正常核对。筛选入口显示排除记录数，CSV / JSON 同步导出统计、两侧位号和命中词。
+- 可编辑关键词排除非贴片物料，逐条记录排除原因。默认：锡膏、PCB、助焊剂、包装材料、贴纸、碳带（覆盖高温贴纸、树脂碳带等描述）。
+- 关键词命中的非空料号及其在 BOM / A+B 中的对应行，全部直接列入“已排除物料”，保留命中词、命中来源及导入问题，不计入 PASS 或 NG；空料号只排除命中本行。未命中关键词的缺位号物料仍为 NG，避免漏检。旧版默认词表自动升级，自定义词表及禁用选择保留。筛选入口显示排除记录数，CSV / JSON 同步导出统计、两侧位号和命中词。
 - 候选替代料单独审计，不自动继承上一行数量/位号，不自动替换 BOM 料号。
 - 导出 CSV（Excel 可打开）和完整 JSON，包含规则和审计记录。
 - 独立“设置”页管理 Chat Completions 兼容接口地址、模型、API Key 和单批原文大小；支持云端 HTTPS 和 localhost HTTP（例如 Ollama）。地址、模型、分批上限可保存；密钥仅保存在内存，关闭程序后清除。连接测试独立显示，不覆盖分析报告。
@@ -42,7 +42,9 @@
 从 [GitHub Releases](https://github.com/Marginal-Z/SMT-CHECK/releases/latest) 直接下载当前版本安装包：
 
 - **Windows x64：`SMT-CHECK-Setup-x64.exe`**。运行安装向导，选择安装目录（可选择 D 盘）；安装完成后从开始菜单启动 SMT-CHECK，可在系统“已安装的应用”中卸载。安装程序自动管理全部运行库和资源，无需解压或手动维护文件。安装向导也提供中、英、泰语言选择。
-- **Ubuntu / Debian x64：`SMT-CHECK-linux-amd64.deb`**。通过系统软件安装器打开，安装后在应用菜单启动 SMT-CHECK。
+- **Windows ARM64：`SMT-CHECK-Setup-arm64.exe`**。用于 ARM64 Windows 11 设备，原生运行；安装方法同 x64。
+- **macOS Intel / Apple Silicon：`SMT-CHECK-macos-universal.dmg`**。macOS 12+ 通用安装镜像，打开后将单个 SMT-CHECK.app 拖到 Applications。应用为临时签名，未进行 Apple Developer ID 签名或公证；系统首次阻止启动时需在“系统设置 → 隐私与安全性”允许打开。
+- **Ubuntu / Debian x64 / ARM64：`SMT-CHECK-linux-amd64.deb` / `SMT-CHECK-linux-arm64.deb`**。按设备架构选择，通过系统软件安装器打开，安装后在应用菜单启动 SMT-CHECK。
 
 软件本地核对不依赖 Excel、Python 或 AI 服务。当前 Windows 安装程序尚未进行代码签名。
 
@@ -57,14 +59,16 @@
 
 ## 下载 GitHub 构建
 
-正式下载入口是上面的 Releases，提供直接下载的 EXE / DEB 安装文件。开发构建也会保存在 [Windows / Linux 构建列表](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml) 的 **Artifacts** 中，保留 30 天；手动点击 **Run workflow** 或向 `main` 推送源码可生成新的构建。
+正式下载入口是上面的 Releases，提供直接下载的 EXE / DEB / DMG 安装文件。开发构建也会保存在 [多平台构建列表](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml) 的 **Artifacts** 中，保留 30 天；手动点击 **Run workflow** 或向 `main` 推送源码可生成新的构建。
 
 - `SMT-CHECK-windows-x64`：包含 Windows EXE 安装程序与 SHA256 校验文件。
-- `SMT-CHECK-linux-x64`：包含 Linux DEB 安装包与 SHA256 校验文件。
+- `SMT-CHECK-windows-arm64`、`SMT-CHECK-linux-arm64`：ARM64 原生安装包和 SHA256。
+- `SMT-CHECK-linux-x64`：Linux amd64 DEB 和 SHA256。
+- `SMT-CHECK-macos-universal`：同时包含 Intel / Apple Silicon 代码的 DMG 和 SHA256。
 
 Artifacts 是供开发验证的外层 ZIP；日常安装请直接使用 Releases 的安装文件。
 
-Linux 包在 Ubuntu 22.04 x64 上构建。运行命令在 **WSL Ubuntu / Linux 图形桌面终端** 中执行；WSL 需有 WSLg 图形支持：
+Linux 两种架构分别在 Ubuntu 22.04 x64 / ARM64 原生构建。运行命令在 **WSL Ubuntu / Linux 图形桌面终端** 中执行；WSL 需有 WSLg 图形支持：
 
 ```bash
 sudo apt install ./SMT-CHECK-linux-amd64.deb
@@ -109,10 +113,10 @@ macOS 构建命令在 **macOS 终端** 中执行：
 
 ```bash
 flutter pub get
-flutter build macos --release
+bash tools/build-macos.sh
 ```
 
-`.github/workflows/desktop.yml` 自动执行 Windows / Linux 的静态检查、测试、release 构建、完整安装、启动及卸载检查和制品上传。macOS 保留源码运行器，需要在 Mac 上另行构建验证。
+`.github/workflows/desktop.yml` 自动执行 Windows / Linux x64 与 ARM64、macOS 通用包的静态检查、测试、release 构建、完整安装、启动及卸载检查和制品上传；同一 macOS DMG 还在 Intel 构建机上安装及启动验证。ARM64 使用官方 Flutter 3.47.2 源码标签引导原生 Dart SDK，避免用 x64 SDK 误构建。
 
 可在 **PowerShell 7** 通过参数直接导入并核对文件：
 

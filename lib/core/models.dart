@@ -101,11 +101,23 @@ class ImportedFile {
 }
 
 class CheckRules {
+  static const legacyKeywords = ['锡膏', 'PCB', '助焊剂', '包装材料', '高温贴纸', '碳带'];
+  static const defaultKeywords = ['锡膏', 'PCB', '助焊剂', '包装材料', '贴纸', '碳带'];
+  // Upgrade only the old default profile. Deliberately customized lists survive.
+  static List<String> restoreKeywords(List<String>? saved) {
+    if (saved == null ||
+        (saved.length == legacyKeywords.length &&
+            saved.toSet().containsAll(legacyKeywords))) {
+      return defaultKeywords;
+    }
+    return saved;
+  }
+
   final bool excludeEnabled;
   final List<String> keywords;
   const CheckRules({
     this.excludeEnabled = true,
-    this.keywords = const ['锡膏', 'PCB', '助焊剂', '包装材料', '高温贴纸', '碳带'],
+    this.keywords = defaultKeywords,
   });
   List<String> matchedKeywords(MaterialRow row) {
     if (!excludeEnabled) return const [];
@@ -140,6 +152,7 @@ class CheckRules {
   Map<String, dynamic> toJson() => {
     'excludeEnabled': excludeEnabled,
     'keywords': keywords,
+    'keywordScope': 'normalized_part_all_sources',
   };
 }
 

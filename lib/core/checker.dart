@@ -21,9 +21,26 @@ class Checker {
     final b = <String, List<MaterialRow>>{},
         s = <String, List<MaterialRow>>{},
         items = <CheckItem>[];
+    // Exclusion is a material/part decision across BOM and A+B. A counterpart
+    // with a shorter description must not reappear as a false missing-part NG.
+    // Empty part numbers never associate unrelated source records.
+    final keywordSources = <String, List<MaterialRow>>{};
+    for (final row in [...bom.rows, ...stations.expand((f) => f.rows)]) {
+      final key = normalizePart(row.part);
+      if (key.isNotEmpty && rules.matchedKeywords(row).isNotEmpty) {
+        keywordSources.putIfAbsent(key, () => []).add(row);
+      }
+    }
     void collect(MaterialRow row, bool isBom) {
-      final excluded = rules.exclusion(row);
-      final matchedKeywords = rules.matchedKeywords(row);
+      final ownKeywords = rules.matchedKeywords(row);
+      final sources = keywordSources[normalizePart(row.part)] ?? [];
+      final matchedKeywords = {
+        ...ownKeywords,
+        ...sources.expand(rules.matchedKeywords),
+      }.toList();
+      final excluded = ownKeywords.isNotEmpty || matchedKeywords.isEmpty
+          ? rules.exclusion(row)
+          : '同料号命中排除关键词「${matchedKeywords.join('、')}」；命中来源：${sources.map((r) => '${r.side.isEmpty ? '' : '${r.side} · '}${r.file} / ${r.sheet}:${r.row}').join('；')}';
       if (excluded != null &&
           (matchedKeywords.isNotEmpty || row.importIssues.isEmpty)) {
         items.add(

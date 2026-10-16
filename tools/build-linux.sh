@@ -8,14 +8,24 @@ if [[ "${1:-}" != "--skip-checks" ]]; then
   flutter analyze --no-pub
   flutter test --no-pub
 fi
-flutter build linux --release --no-pub
-source_dir="$task_root/build/linux/x64/release/bundle"
-destination="$task_root/dist/SMT-CHECK-linux-x64"
+case "$(uname -m)" in
+  x86_64) flutter_arch=x64; deb_arch=amd64; elf_machine='Advanced Micro Devices X86-64' ;;
+  aarch64) flutter_arch=arm64; deb_arch=arm64; elf_machine=AArch64 ;;
+  *) echo 'Unsupported Linux build architecture' >&2; exit 1 ;;
+esac
+flutter build linux --release --no-pub --target-platform="linux-$flutter_arch"
+source_dir="$task_root/build/linux/$flutter_arch/release/bundle"
+mkdir -p "$task_root/dist"
+destination="$(mktemp -d "$task_root/dist/linux-$flutter_arch.XXXXXX")"
 mkdir -p -- "$destination"
 cp -a -- "$source_dir/." "$destination/"
 cp -- "$task_root/README.md" "$destination/README.md"
 cp -- "$task_root/assets/fonts/OFL-NotoSansThai.txt" "$destination/OFL-NotoSansThai.txt"
 test -x "$destination/SMT-CHECK"
+readelf -h "$destination/SMT-CHECK" | grep -F "$elf_machine"
+while IFS= read -r -d '' library; do
+  readelf -h "$library" | grep -F "$elf_machine"
+done < <(find "$destination/lib" -name '*.so' -print0)
 version="$(sed -n 's/^version: *\([^+ ]*\).*/\1/p' pubspec.yaml)"
 package_root="$(mktemp -d "$task_root/dist/deb-stage.XXXXXX")"
 mkdir -p "$package_root/DEBIAN" "$package_root/opt/smt-check" "$package_root/usr/bin" "$package_root/usr/share/applications" "$package_root/usr/share/icons/hicolor/256x256/apps"
@@ -27,7 +37,7 @@ Package: smt-check
 Version: $version
 Section: utils
 Priority: optional
-Architecture: amd64
+Architecture: $deb_arch
 Maintainer: Marginal-Z <289210392+Marginal-Z@users.noreply.github.com>
 Depends: libgtk-3-0 (>= 3.22), libstdc++6, libglib2.0-0, libc6 (>= 2.35), libegl1, libgles2
 Homepage: https://github.com/Marginal-Z/SMT-CHECK
@@ -46,6 +56,6 @@ Categories=Office;Utility;
 StartupWMClass=com.smtcheck.smt_check
 EOF
 chmod 755 "$package_root" "$package_root/DEBIAN" "$package_root/opt/smt-check/SMT-CHECK"
-dpkg-deb --root-owner-group --build "$package_root" "$task_root/dist/SMT-CHECK-linux-amd64.deb"
-(cd -- "$task_root/dist" && sha256sum SMT-CHECK-linux-amd64.deb > SMT-CHECK-linux-amd64.deb.sha256)
-printf 'Desktop installer: %s\n' "$task_root/dist/SMT-CHECK-linux-amd64.deb"
+dpkg-deb --root-owner-group --build "$package_root" "$task_root/dist/SMT-CHECK-linux-$deb_arch.deb"
+(cd -- "$task_root/dist" && sha256sum "SMT-CHECK-linux-$deb_arch.deb" > "SMT-CHECK-linux-$deb_arch.deb.sha256")
+printf 'Desktop installer: %s\n' "$task_root/dist/SMT-CHECK-linux-$deb_arch.deb"

@@ -1,4 +1,4 @@
-name: Windows and Linux desktop builds
+name: Multiplatform desktop builds
 
 on:
   push:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   desktop:
-    name: ${{ matrix.platform }} x64
+    name: ${{ matrix.platform }} ${{ matrix.arch }}
     timeout-minutes: 40
     strategy:
       fail-fast: false
@@ -24,10 +24,24 @@ jobs:
         include:
           - os: windows-2022
             platform: windows
+            arch: x64
             package: dist/SMT-CHECK-Setup-x64.exe
+          - os: windows-11-arm
+            platform: windows
+            arch: arm64
+            package: dist/SMT-CHECK-Setup-arm64.exe
           - os: ubuntu-22.04
             platform: linux
+            arch: x64
             package: dist/SMT-CHECK-linux-amd64.deb
+          - os: ubuntu-22.04-arm
+            platform: linux
+            arch: arm64
+            package: dist/SMT-CHECK-linux-arm64.deb
+          - os: macos-15
+            platform: macos
+            arch: universal
+            package: dist/SMT-CHECK-macos-universal.dmg
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out source
@@ -40,11 +54,33 @@ jobs:
           sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb xauth libgl1-mesa-dri libegl1 libgles2
 
       - name: Set up Flutter
+        if: matrix.arch != 'arm64'
         uses: subosito/flutter-action@v2.23.0
         with:
           flutter-version: '3.47.2'
           channel: stable
           cache: true
+
+      # Official SDK archives do not include Windows/Linux ARM64 hosts.
+      # Bootstrap the exact official source tag: its scripts fetch native Dart
+      # and engine artifacts. Never run an x64 Dart VM to build Windows ARM64.
+      - name: Set up native Flutter on Linux ARM64
+        if: runner.os == 'Linux' && matrix.arch == 'arm64'
+        run: |
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+          echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/flutter/bin/flutter" --version
+
+      - name: Set up native Flutter on Windows ARM64
+        if: runner.os == 'Windows' && matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          $sdk = Join-Path $env:RUNNER_TEMP 'flutter'
+          git clone --depth 1 --branch 3.47.2 https://github.com/flutter/flutter.git $sdk
+          if ($LASTEXITCODE -ne 0) { throw 'Flutter source checkout failed' }
+          Join-Path $sdk 'bin' | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          & "$sdk/bin/flutter.bat" --version
+          if ($LASTEXITCODE -ne 0) { throw 'Native Flutter bootstrap failed' }
 
       - name: Install locked dependencies
         run: flutter pub get --enforce-lockfile
@@ -64,14 +100,14 @@ jobs:
           $setup = Start-Process -FilePath "$env:RUNNER_TEMP/innosetup.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/CURRENTUSER',"/DIR=$compilerRoot" -Wait -PassThru -WindowStyle Hidden
           if ($setup.ExitCode -ne 0) { throw "Compiler installation failed: $($setup.ExitCode)" }
           $env:ISCC_PATH = Join-Path $compilerRoot 'ISCC.exe'
-          ./tools/build-windows.ps1 -SkipChecks
+          ./tools/build-windows.ps1 -SkipChecks -Architecture '${{ matrix.arch }}'
 
       - name: Install, launch and uninstall Windows application
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $installDir = Join-Path $env:RUNNER_TEMP 'SMT-CHECK-Installed'
-          $installer = Start-Process -FilePath (Resolve-Path 'dist/SMT-CHECK-Setup-x64.exe').Path -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/DIR=$installDir",'/TASKS=' -Wait -PassThru -WindowStyle Hidden
+          $installer = Start-Process -FilePath (Resolve-Path '${{ matrix.package }}').Path -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/DIR=$installDir",'/TASKS=' -Wait -PassThru -WindowStyle Hidden
           if ($installer.ExitCode -ne 0) { throw "Application install failed: $($installer.ExitCode)" }
           $exe = Join-Path $installDir 'SMT-CHECK.exe'
           if (-not (Test-Path -LiteralPath $exe)) { throw 'Installed executable is missing' }
@@ -97,7 +133,8 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
-          sudo dpkg -i dist/SMT-CHECK-linux-amd64.deb
+          test "$(dpkg-deb -f '${{ matrix.package }}' Architecture)" = "$(dpkg --print-architecture)"
+          sudo dpkg -i '${{ matrix.package }}'
           test -f /usr/share/applications/smt-check.desktop
           python3 - <<'PY'
           import json
@@ -121,13 +158,37 @@ jobs:
           sudo dpkg --remove smt-check
           test ! -e /opt/smt-check/SMT-CHECK
 
+      - name: Build and package macOS universal
+        if: runner.os == 'macOS'
+        run: bash tools/build-macos.sh --skip-checks
+
+      - name: Install, launch and uninstall macOS application
+        if: runner.os == 'macOS'
+        run: bash tools/smoke-macos.sh '${{ matrix.package }}'
+
       - name: Upload desktop package
         uses: actions/upload-artifact@v7.0.2
         with:
-          name: SMT-CHECK-${{ matrix.platform }}-x64
+          name: SMT-CHECK-${{ matrix.platform }}-${{ matrix.arch }}
           path: |
             ${{ matrix.package }}
             ${{ matrix.package }}.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
+
+  macos-intel:
+    name: macos Intel installation
+    needs: desktop
+    runs-on: macos-15-intel
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: SMT-CHECK-macos-universal
+          path: dist
+      - name: Verify checksum
+        run: (cd dist && shasum -a 256 -c SMT-CHECK-macos-universal.dmg.sha256)
+      - name: Install, launch and uninstall macOS application
+        run: bash tools/smoke-macos.sh dist/SMT-CHECK-macos-universal.dmg

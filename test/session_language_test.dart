@@ -65,6 +65,10 @@ void main() {
             await tester.pumpAndSettle();
             expect(find.text(translate('非贴片物料排除规则', language)), findsOneWidget);
             expect(find.text(translate('导入审计', language)), findsOneWidget);
+            await tester.tap(find.text(translate('关于与更新', language)));
+            await tester.pumpAndSettle();
+            expect(find.byKey(const Key('check-updates')), findsOneWidget);
+            expect(tester.takeException(), isNull);
             await tester.tap(find.text(translate('外观与 AI 接口', language)));
             await tester.pumpAndSettle();
             expect(find.text(translate('API 基础地址', language)), findsOneWidget);

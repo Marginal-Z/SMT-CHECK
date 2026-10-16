@@ -12,7 +12,13 @@ Map<String, dynamic> releaseData({String tag = 'v1.10.0'}) => {
   'prerelease': false,
   'body': '更新说明',
   'assets': [
-    for (final name in ['SMT-CHECK-Setup-x64.exe', 'SMT-CHECK-linux-amd64.deb'])
+    for (final name in [
+      'SMT-CHECK-Setup-x64.exe',
+      'SMT-CHECK-Setup-arm64.exe',
+      'SMT-CHECK-linux-amd64.deb',
+      'SMT-CHECK-linux-arm64.deb',
+      'SMT-CHECK-macos-universal.dmg',
+    ])
       {
         'name': name,
         'state': 'uploaded',
@@ -30,6 +36,51 @@ UpdateService serviceFor(Map<String, dynamic> data) => UpdateService(
 );
 
 void main() {
+  for (final (platform, arch, file) in [
+    ('windows', 'x64', 'SMT-CHECK-Setup-x64.exe'),
+    ('windows', 'arm64', 'SMT-CHECK-Setup-arm64.exe'),
+    ('linux', 'x64', 'SMT-CHECK-linux-amd64.deb'),
+    ('linux', 'arm64', 'SMT-CHECK-linux-arm64.deb'),
+    ('macos', 'x64', 'SMT-CHECK-macos-universal.dmg'),
+    ('macos', 'arm64', 'SMT-CHECK-macos-universal.dmg'),
+    ('windows', 'x86', null),
+    ('linux', 'unknown', null),
+  ]) {
+    test('update installer matches $platform / $arch', () async {
+      final service = serviceFor(releaseData());
+      addTearDown(service.close);
+      final release = await service.check(
+        currentVersion: '1.0.0',
+        platform: platform,
+        architecture: arch,
+      );
+      expect(release.installer?.pathSegments.last, file);
+    });
+  }
+  test('ARM64 update never falls back to an x64-only release', () async {
+    final data = releaseData();
+    (data['assets'] as List).removeWhere(
+      (a) => (a['name'] as String).contains('arm64'),
+    );
+    final service = serviceFor(data);
+    addTearDown(service.close);
+    expect(
+      (await service.check(
+        currentVersion: '1.0.0',
+        platform: 'windows',
+        architecture: 'arm64',
+      )).installer,
+      isNull,
+    );
+    expect(
+      (await service.check(
+        currentVersion: '1.0.0',
+        platform: 'linux',
+        architecture: 'arm64',
+      )).installer,
+      isNull,
+    );
+  });
   test(
     'uses a separate public request and selects the correct platform installer',
     () async {
@@ -51,6 +102,7 @@ void main() {
         final release = await service.check(
           currentVersion: '1.9.9',
           platform: platform,
+          architecture: 'x64',
         );
         expect(release.hasUpdate, true);
         expect(release.latest.toString(), '1.10.0');
@@ -78,6 +130,7 @@ void main() {
         (await service.check(
           currentVersion: current,
           platform: 'windows',
+          architecture: 'x64',
         )).hasUpdate,
         false,
       );
@@ -90,6 +143,7 @@ void main() {
       (await service.check(
         currentVersion: '1.10.0-beta.1',
         platform: 'windows',
+        architecture: 'x64',
       )).hasUpdate,
       true,
     );
@@ -101,6 +155,7 @@ void main() {
       (await service.check(
         currentVersion: '1.10.0',
         platform: 'windows',
+        architecture: 'x64',
       )).hasUpdate,
       false,
     );
@@ -132,6 +187,7 @@ void main() {
       final release = await service.check(
         currentVersion: '1.0.0',
         platform: 'windows',
+        architecture: 'x64',
       );
       expect(release.installer, null);
       expect(

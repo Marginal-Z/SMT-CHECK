@@ -21,6 +21,7 @@ class ControlledUpdates extends UpdateService {
   Future<AppRelease> check({
     required String currentVersion,
     required String platform,
+    String? architecture,
   }) => result;
   @override
   void close() {
@@ -38,6 +39,15 @@ AppRelease newerRelease() => AppRelease(
     '$releaseRepository/releases/download/v1.7.0/SMT-CHECK-Setup-x64.exe',
   ),
 );
+
+Future<void> openUpdateSettings(WidgetTester tester) async {
+  final shell = tester.widget<SmtCheckApp>(find.byType(SmtCheckApp));
+  final language = shell.initialLanguage;
+  await tester.tap(find.byTooltip(translate('设置', language)));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(translate('关于与更新', language)));
+  await tester.pumpAndSettle();
+}
 
 void main() {
   WidgetController.hitTestWarningShouldBeFatal = true;
@@ -68,6 +78,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openUpdateSettings(tester);
       await tester.tap(find.byKey(const Key('check-updates')));
       await tester.pumpAndSettle();
       expect(find.text('当前版本：1.7.0'), findsOneWidget);
@@ -104,12 +115,15 @@ void main() {
           await tester.pumpAndSettle();
           expect(find.byKey(const Key('brand-icon')), findsNothing);
           expect(find.text('SMT-CHECK'), findsNothing);
-          expect(find.byKey(const Key('check-updates')), findsOneWidget);
+          expect(find.byKey(const Key('check-updates')), findsNothing);
+          await openUpdateSettings(tester);
           await tester.tap(find.byKey(const Key('check-updates')));
           await tester.pumpAndSettle();
           expect(find.text(translate('当前版本：1.6.0', language)), findsOneWidget);
           expect(find.text(translate('发现新版本 1.7.0', language)), findsOneWidget);
-          final downloadLabel = Platform.isLinux
+          final downloadLabel = Platform.isMacOS
+              ? '下载 macOS 安装包'
+              : Platform.isLinux
               ? '下载 Linux 安装包'
               : '下载 Windows 安装包';
           // This controlled service supplies an installer on either CI platform.
@@ -140,6 +154,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openUpdateSettings(tester);
       await tester.tap(find.byKey(const Key('check-updates')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -171,6 +186,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await openUpdateSettings(tester);
       await tester.tap(find.byKey(const Key('check-updates')));
       await tester.pumpAndSettle();
       expect(find.text('检查更新超时，请检查网络后重试。'), findsOneWidget);

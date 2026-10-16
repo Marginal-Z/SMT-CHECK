@@ -1,5 +1,23 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '关于与更新': ['About & updates', 'เกี่ยวกับและอัปเดต'],
+  '原生桌面应用 · Windows / Linux / macOS': [
+    'Native desktop app · Windows / Linux / macOS',
+    'แอปเดสก์ท็อปเนทีฟ · Windows / Linux / macOS',
+  ],
+  '支持 x64 与 ARM64，更新时自动匹配当前程序架构。': [
+    'Supports x64 and ARM64. Updates match the running app architecture.',
+    'รองรับ x64 และ ARM64 โดยเลือกอัปเดตตามสถาปัตยกรรมของแอปที่กำลังทำงาน',
+  ],
+  '下载 macOS 安装包': ['Download macOS installer', 'ดาวน์โหลดตัวติดตั้ง macOS'],
+  '命中关键词的料号及其 BOM / A+B 对应记录全部进入已排除物料，不计入 NG。详情保留命中词、来源和导入问题；空料号仅排除本行。': [
+    'Parts matching a keyword and their BOM / A+B records enter Excluded, outside NG. Matched words, sources and import issues remain visible. Empty part numbers only exclude the matching row.',
+    'รหัสวัสดุที่ตรงคำสำคัญและรายการ BOM / A+B ที่เกี่ยวข้องจะอยู่ในวัสดุที่ยกเว้น ไม่นับเป็น NG โดยเก็บคำที่ตรง แหล่งข้อมูลและปัญหาการนำเข้าไว้ รหัสว่างยกเว้นเฉพาะแถวที่ตรง',
+  ],
+  '同料号命中排除关键词「{words}」；命中来源：{sources}': [
+    'This part matches exclusion keywords "{words}"; matched sources: {sources}',
+    'รหัสวัสดุนี้ตรงคำสำคัญที่ยกเว้น "{words}" แหล่งที่ตรง: {sources}',
+  ],
   '字段差异对照': ['Field differences', 'ความแตกต่างของแต่ละฟิลด์'],
   'BOM 汇总数量': ['BOM total quantity', 'จำนวนรวม BOM'],
   'SMT 汇总数量': ['SMT total quantity', 'จำนวนรวม SMT'],

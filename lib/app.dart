@@ -127,8 +127,9 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         }
         rules = CheckRules(
           excludeEnabled: prefs!.getBool('exclude') ?? true,
-          keywords:
-              prefs!.getStringList('keywords') ?? const CheckRules().keywords,
+          keywords: CheckRules.restoreKeywords(
+            prefs!.getStringList('keywords'),
+          ),
         );
         keywordController.text = rules.keywords.join('\n');
         url.text = prefs!.getString('aiUrl') ?? '';
@@ -780,7 +781,6 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               setState(() => dark = !dark);
               unawaited(prefs?.setBool('dark', dark));
             },
-            onCheckUpdates: () => unawaited(checkUpdates(context)),
             child: switch (page) {
               0 => workspace(context),
               1 => aiPage(context),
@@ -1008,7 +1008,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               const SizedBox(height: 12),
               caption(
                 context,
-                '排除记录单独显示并写入报告，注明命中词与来源。零用量且无位号的总成记录单独排除；候选替代料不自动替换 BOM 料号。',
+                '命中关键词的料号及其 BOM / A+B 对应记录全部进入已排除物料，不计入 NG。详情保留命中词、来源和导入问题；空料号仅排除本行。',
               ),
               const SizedBox(height: 16),
               DeskButton(
@@ -1120,11 +1120,47 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             icon: Icons.rule_outlined,
             onPressed: () => setState(() => settingsSection = 1),
           ),
+          DeskButton(
+            '关于与更新',
+            selected: settingsSection == 2,
+            icon: Icons.info_outline,
+            onPressed: () => setState(() => settingsSection = 2),
+          ),
         ],
       ),
       const SizedBox(height: 16),
       Expanded(
-        child: settingsSection == 0 ? aiSettings(context) : rulesPage(context),
+        child: switch (settingsSection) {
+          0 => aiSettings(context),
+          1 => rulesPage(context),
+          _ => SingleChildScrollView(
+            child: Pane(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'SMT-CHECK',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  caption(context, '原生桌面应用 · Windows / Linux / macOS'),
+                  const SizedBox(height: 8),
+                  caption(context, '支持 x64 与 ARM64，更新时自动匹配当前程序架构。'),
+                  const SizedBox(height: 20),
+                  DeskButton(
+                    '检查更新',
+                    key: const Key('check-updates'),
+                    primary: true,
+                    icon: Icons.system_update_alt,
+                    onPressed: () => unawaited(checkUpdates(context)),
+                  ),
+                  const SizedBox(height: 12),
+                  caption(context, '在系统浏览器中下载完整安装包。'),
+                ],
+              ),
+            ),
+          ),
+        },
       ),
     ],
   );

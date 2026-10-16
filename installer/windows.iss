@@ -1,5 +1,11 @@
 #ifndef AppVersion
-  #define AppVersion "1.8.0"
+  #define AppVersion "1.9.0"
+#endif
+#ifndef AppArchitecture
+  #define AppArchitecture "x64"
+#endif
+#ifndef PayloadDir
+  #define PayloadDir "..\dist\SMT-CHECK-windows"
 #endif
 
 [Setup]
@@ -13,11 +19,16 @@ DefaultGroupName=SMT-CHECK
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 OutputDir=..\dist
-OutputBaseFilename=SMT-CHECK-Setup-x64
+OutputBaseFilename=SMT-CHECK-Setup-{#AppArchitecture}
 SetupIconFile=..\windows\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\SMT-CHECK.exe
+#if AppArchitecture == "arm64"
+ArchitecturesAllowed=arm64
+ArchitecturesInstallIn64BitMode=arm64
+#else
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
+#endif
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
@@ -37,7 +48,7 @@ Name: "thai"; MessagesFile: "Thai.isl"
 Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 
 [Files]
-Source: "..\dist\SMT-CHECK-windows\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\SMT-CHECK"; Filename: "{app}\SMT-CHECK.exe"; WorkingDir: "{app}"
