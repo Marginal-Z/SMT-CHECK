@@ -17,9 +17,9 @@ ditto "$mount_dir/SMT-CHECK.app" "$app"
 expected="$(sed -n 's/^version: *\([^+ ]*\).*/\1/p' pubspec.yaml)"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$expected"
 for arch in arm64 x86_64; do
-  lipo -verify_arch "$arch" "$app/Contents/MacOS/SMT-CHECK"
-  lipo -verify_arch "$arch" "$app/Contents/Frameworks/App.framework/App"
-  lipo -verify_arch "$arch" "$app/Contents/Frameworks/FlutterMacOS.framework/FlutterMacOS"
+  lipo "$app/Contents/MacOS/SMT-CHECK" -verify_arch "$arch"
+  lipo "$app/Contents/Frameworks/App.framework/App" -verify_arch "$arch"
+  lipo "$app/Contents/Frameworks/FlutterMacOS.framework/FlutterMacOS" -verify_arch "$arch"
 done
 codesign --verify --deep --strict "$app"
 "$app/Contents/MacOS/SMT-CHECK" > "$install_dir/startup.log" 2>&1 &

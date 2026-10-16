@@ -68,6 +68,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/app_icon.png
+    - assets/fonts/OFL-NotoSansThai.txt
   fonts:
     - family: Noto Sans Thai
       fonts:

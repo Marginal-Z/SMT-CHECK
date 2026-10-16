@@ -14,9 +14,9 @@ flutter build macos --release --no-pub
 app="$task_root/build/macos/Build/Products/Release/SMT-CHECK.app"
 test -d "$app"
 for arch in arm64 x86_64; do
-  lipo -verify_arch "$arch" "$app/Contents/MacOS/SMT-CHECK"
-  lipo -verify_arch "$arch" "$app/Contents/Frameworks/App.framework/App"
-  lipo -verify_arch "$arch" "$app/Contents/Frameworks/FlutterMacOS.framework/FlutterMacOS"
+  lipo "$app/Contents/MacOS/SMT-CHECK" -verify_arch "$arch"
+  lipo "$app/Contents/Frameworks/App.framework/App" -verify_arch "$arch"
+  lipo "$app/Contents/Frameworks/FlutterMacOS.framework/FlutterMacOS" -verify_arch "$arch"
 done
 codesign --verify --deep --strict "$app"
 mkdir -p "$task_root/dist"
