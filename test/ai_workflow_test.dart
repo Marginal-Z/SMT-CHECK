@@ -34,8 +34,16 @@ http.Response reply(String text, {bool source = true}) => http.Response.bytes(
                     'anomalies': [
                       {
                         'part': 'K1',
-                        'category': '位号差异',
-                        'reason': text,
+                        'category': {
+                          'zh': '位号差异',
+                          'en': 'Reference mismatch',
+                          'th': 'ตำแหน่งไม่ตรงกัน',
+                        },
+                        'reason': {
+                          'zh': text,
+                          'en': '$text (EN)',
+                          'th': '$text (TH)',
+                        },
                         'bom': 'R1',
                         'smt': 'R2',
                         'source': 'bom.xlsx Sheet:2; station.xlsx Sheet:2',

@@ -421,7 +421,7 @@ class AiSettingsPanel extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.only(top: 14),
                       child: SelectableText(
-                        connection,
+                        localText(context, connection),
                         style: const TextStyle(fontSize: 13, height: 1.6),
                       ),
                     ),

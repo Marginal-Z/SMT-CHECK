@@ -1,11 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:smt_check/l10n/localization.dart';
 import 'package:smt_check/services/ai_findings.dart';
 import 'package:smt_check/ui/ai_activity.dart';
 import 'package:smt_check/ui/ai_findings_view.dart';
 import 'package:smt_check/ui/design.dart';
 
 void main() {
+  for (final language in ['zh', 'en', 'th']) {
+    testWidgets('thinking caption uses the requested AI wording in $language', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: Locale(language),
+          supportedLocales: const [Locale('zh'), Locale('en'), Locale('th')],
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          theme: desktopTheme(false),
+          home: const Scaffold(
+            body: AiActivity(
+              busy: true,
+              stage: AiStage.thinking,
+              completed: 0,
+              total: 4,
+              characters: 0,
+            ),
+          ),
+        ),
+      );
+      expect(find.text(translate('AI正在分析', language)), findsOneWidget);
+      expect(find.text('模型正在分析原文件'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpAndSettle();
+    });
+  }
   testWidgets(
     'reopening the activity restores request elapsed time and disposes its ticker',
     (tester) async {

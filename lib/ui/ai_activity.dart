@@ -81,8 +81,9 @@ class _AiActivityState extends State<AiActivity> {
       AiStage.preparing => '正在整理原文件',
       AiStage.confirming => '等待确认发送',
       AiStage.connecting => '已发起请求，等待模型响应',
-      AiStage.thinking => '模型正在分析原文件',
+      AiStage.thinking => 'AI正在分析',
       AiStage.receiving => '正在接收异常清单',
+      AiStage.localizing => '正在生成三语结果',
       AiStage.complete => '核对完成',
       AiStage.failed => '核对中断',
       AiStage.cancelled => '分析已取消',
@@ -170,7 +171,7 @@ class _AiActivityState extends State<AiActivity> {
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
               child: SelectableText(
-                widget.notice,
+                localText(context, widget.notice),
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.6,

@@ -161,9 +161,15 @@ const catalog = <String, List<String>>{
     'Request sent; waiting for the model',
     'ส่งคำขอแล้ว กำลังรอโมเดลตอบกลับ',
   ],
-  '模型正在分析原文件': [
-    'The model is analyzing original files',
-    'โมเดลกำลังวิเคราะห์ไฟล์ต้นฉบับ',
+  'AI正在分析': ['AI is analyzing', 'AI กำลังวิเคราะห์'],
+  '正在生成三语结果': ['Preparing multilingual results', 'กำลังเตรียมผลลัพธ์สามภาษา'],
+  'AI 返回的三语结果不完整，请重试分析。': [
+    'AI returned incomplete multilingual results. Please retry the analysis.',
+    'AI ส่งผลลัพธ์สามภาษาไม่ครบ โปรดลองวิเคราะห์อีกครั้ง',
+  ],
+  'AI 结果三语转换失败：{message}': [
+    'Unable to translate AI results: {message}',
+    'แปลผลลัพธ์ AI ไม่สำเร็จ: {message}',
   ],
   '正在接收异常清单': ['Receiving anomaly results', 'กำลังรับรายการผิดปกติ'],
   '核对完成': ['Verification complete', 'ตรวจสอบเสร็จแล้ว'],

@@ -17,6 +17,7 @@ class AiFindingsView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
+    final language = Localizations.localeOf(context).languageCode;
     if (findings.isEmpty) {
       return Center(
         child: Padding(
@@ -83,7 +84,7 @@ class AiFindingsView extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    item.category,
+                    item.categoryFor(language),
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -94,7 +95,7 @@ class AiFindingsView extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               SelectableText(
-                item.reason,
+                item.reasonFor(language),
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.6,

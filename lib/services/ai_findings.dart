@@ -1,5 +1,8 @@
 import 'dart:convert';
 
+import '../l10n/localization.dart';
+import 'ai_result_languages.dart';
+
 enum AiStage {
   idle,
   preparing,
@@ -7,6 +10,7 @@ enum AiStage {
   connecting,
   thinking,
   receiving,
+  localizing,
   complete,
   failed,
   cancelled,
@@ -20,6 +24,7 @@ class AiTransfer {
 
 class AiFinding {
   final String part, category, reason, bom, smt, source;
+  final Map<String, String> categories, reasons;
   const AiFinding({
     required this.part,
     required this.category,
@@ -27,19 +32,43 @@ class AiFinding {
     this.bom = '',
     this.smt = '',
     this.source = '',
+    this.categories = const {},
+    this.reasons = const {},
   });
-  Map<String, String> toJson() => {
+  bool get hasAllLanguages => supportedLanguages.every(
+    (language) =>
+        (categories[language]?.trim().isNotEmpty ?? false) &&
+        (reasons[language]?.trim().isNotEmpty ?? false),
+  );
+  String categoryFor(String language) => categories[language] ?? category;
+  String reasonFor(String language) => reasons[language] ?? reason;
+  AiFinding localized(
+    Map<String, String> categoryValues,
+    Map<String, String> reasonValues,
+  ) => AiFinding(
+    part: part,
+    category: categoryValues['zh']!,
+    reason: reasonValues['zh']!,
+    categories: categoryValues,
+    reasons: reasonValues,
+    bom: bom,
+    smt: smt,
+    source: source,
+  );
+  Map<String, dynamic> toJson() => {
     'part': part,
-    'category': category,
-    'reason': reason,
+    'category': categories.isEmpty ? category : categories,
+    'reason': reasons.isEmpty ? reason : reasons,
     'bom': bom,
     'smt': smt,
     'source': source,
   };
-  String get identity => jsonEncode(toJson());
-  String toText() => [
-    '$part · $category',
-    reason,
+  // Secondary translations must not turn the same finding into duplicates.
+  String get identity =>
+      jsonEncode([part, categoryFor('zh'), reasonFor('zh'), bom, smt, source]);
+  String toText({String language = 'zh'}) => [
+    '$part · ${categoryFor(language)}',
+    reasonFor(language),
     if (bom.isNotEmpty) 'BOM: $bom',
     if (smt.isNotEmpty) 'SMT: $smt',
     if (source.isNotEmpty) source,
@@ -50,15 +79,9 @@ class AiFinding {
 /// never converted into a successful "no anomalies" result.
 List<AiFinding> parseAiFindings(String response) {
   const invalid = FormatException('AI 未返回有效的异常清单，本批未完成，请重试未完成批次。');
-  var text = response.trim();
-  if (text.startsWith('```') && text.endsWith('```')) {
-    final firstLine = text.indexOf('\n');
-    if (firstLine < 0) throw invalid;
-    text = text.substring(firstLine + 1, text.length - 3).trim();
-  }
   dynamic data;
   try {
-    data = jsonDecode(text);
+    data = decodeAiJson(response);
   } catch (_) {
     throw invalid;
   }
@@ -72,8 +95,24 @@ List<AiFinding> parseAiFindings(String response) {
           (required && (result is! String || result.trim().isEmpty))) {
         throw invalid;
       }
-      return result is String ? result.trim() : '';
+      return result is String ? (required ? result.trim() : result) : '';
     }
+
+    Map<String, String> translations(String key) {
+      final result = value[key];
+      if (result is String && result.trim().isNotEmpty) return const {};
+      try {
+        return aiLanguageMap(result);
+      } on FormatException {
+        throw invalid;
+      }
+    }
+
+    final categories = translations('category'),
+        reasons = translations('reason');
+    String base(String key, Map<String, String> values) => values.isEmpty
+        ? field(key, required: true)
+        : values['zh'] ?? values.values.first;
 
     if (value.containsKey('status') &&
         !['error', 'anomaly'].contains(value['status'])) {
@@ -82,8 +121,10 @@ List<AiFinding> parseAiFindings(String response) {
     findings.add(
       AiFinding(
         part: field('part', required: true),
-        category: field('category', required: true),
-        reason: field('reason', required: true),
+        category: base('category', categories),
+        reason: base('reason', reasons),
+        categories: categories,
+        reasons: reasons,
         bom: field('bom'),
         smt: field('smt'),
         source: field('source'),
