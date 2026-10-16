@@ -10,7 +10,7 @@ void main() {
   for (final accent in ThemeAccent.values) {
     for (final dark in [false, true]) {
       testWidgets(
-        'selection has a marker, outline and label for $accent dark=$dark',
+        'selection uses a neutral marker and rail for $accent dark=$dark',
         (tester) async {
           tester.view.physicalSize = const Size(1560, 980);
           tester.view.devicePixelRatio = 1;
@@ -48,9 +48,10 @@ void main() {
                 tester.widget<Container>(find.byKey(ObjectKey(item))).decoration
                     as BoxDecoration;
             final border = decoration.border as Border;
-            expect(border.top.color, Palette(dark, accent).accent);
-            expect(border.top.width, 2);
-            expect(border.right.color, Palette(dark, accent).accent);
+            expect(border.left.color, Palette(dark, accent).text);
+            expect(border.left.width, 4);
+            expect(border.top.width, 0);
+            expect(border.right.width, 0);
             expect(
               decoration.color,
               Palette(dark, accent).result(item.status, selected: true).fill,

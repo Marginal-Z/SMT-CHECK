@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'localized_text.dart';
 import '../core/models.dart';
 
-const good = Color(0xFF0A713B), bad = Color(0xFFB21E2B);
+const good = Color(0xFF0EDC61), bad = Color(0xFFFF3B30);
 
 enum ThemeAccent { black, blue, green }
 
@@ -55,25 +55,23 @@ class Palette {
   ResultColors result(CheckStatus status, {bool selected = false}) =>
       switch (status) {
         CheckStatus.pass => ResultColors(
-          dark
-              ? (selected ? const Color(0xFF1A603F) : const Color(0xFF12462E))
-              : (selected ? const Color(0xFF94D5AF) : const Color(0xFFBCE8CD)),
-          dark ? const Color(0xFFB3FFD0) : const Color(0xFF07582B),
-          dark ? const Color(0xFF60D493) : good,
-          const Color(0xFF086637),
-          Colors.white,
+          dark ? const Color(0xFF104A29) : const Color(0xFF8BF0AE),
+          dark ? const Color(0xFFB3FFD0) : const Color(0xFF083D1C),
+          good,
+          good,
+          const Color(0xFF101A13),
         ),
         CheckStatus.error => ResultColors(
-          dark
-              ? (selected ? const Color(0xFF77313B) : const Color(0xFF5A242B))
-              : (selected ? const Color(0xFFF1A9B2) : const Color(0xFFF8CBCF)),
-          dark ? const Color(0xFFFFCBD0) : const Color(0xFF86121D),
-          dark ? const Color(0xFFFF8493) : bad,
-          const Color(0xFFB21E2B),
-          Colors.white,
+          dark ? const Color(0xFF621E1B) : const Color(0xFFFFAAA3),
+          dark ? const Color(0xFFFFE5E2) : const Color(0xFF701006),
+          bad,
+          bad,
+          const Color(0xFF240200),
         ),
         _ => ResultColors(
-          selected ? accentSoft : hover,
+          selected
+              ? Color.alphaBlend(text.withValues(alpha: .08), hover)
+              : hover,
           muted,
           line,
           hover,
@@ -115,7 +113,7 @@ ThemeData desktopTheme(bool dark, [ThemeAccent accent = ThemeAccent.black]) {
           onPrimary: p.onAccent,
           onSecondary: p.onAccent,
           surface: p.panel,
-          error: bad,
+          error: p.result(CheckStatus.error).ink,
         ),
     textSelectionTheme: TextSelectionThemeData(
       cursorColor: p.accent,

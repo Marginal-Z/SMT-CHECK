@@ -23,12 +23,27 @@ class _Files extends FileSelectorPlatform {
   }) async => XFile('source.xlsx');
 }
 
-http.Response reply(String text) => http.Response.bytes(
+http.Response reply(String text, {bool source = true}) => http.Response.bytes(
   utf8.encode(
     jsonEncode({
       'choices': [
         {
-          'message': {'content': text},
+          'message': {
+            'content': source
+                ? jsonEncode({
+                    'anomalies': [
+                      {
+                        'part': 'K1',
+                        'category': '位号差异',
+                        'reason': text,
+                        'bom': 'R1',
+                        'smt': 'R2',
+                        'source': 'bom.xlsx Sheet:2; station.xlsx Sheet:2',
+                      },
+                    ],
+                  })
+                : text,
+          },
         },
       ],
     }),
@@ -112,7 +127,7 @@ void main() {
           );
           return reply('SOURCE REVIEW');
         }
-        return reply('CONNECTED');
+        return reply('CONNECTED', source: false);
       });
       await startSource(tester);
       await tester.pumpAndSettle();
@@ -279,4 +294,52 @@ void main() {
     expect(find.textContaining('CHECKED B'), findsOneWidget);
     expect(find.textContaining('全部 2 批分析完成'), findsOneWidget);
   });
+  testWidgets(
+    'an empty completed review shows no anomaly cards or passing rows',
+    (tester) async {
+      await prepare(
+        tester,
+        (_) async => reply('{"anomalies":[]}', source: false),
+      );
+      await startSource(tester);
+      await tester.pumpAndSettle();
+      expect(find.text('本次 AI 核对未发现异常'), findsOneWidget);
+      expect(find.text('异常结果 (0)'), findsOneWidget);
+      expect(find.byKey(const ValueKey('ai-finding-0')), findsNothing);
+      expect(find.textContaining('全部 1 批分析完成'), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'an empty first batch followed by failure never claims no anomalies',
+    (tester) async {
+      var calls = 0;
+      await prepare(
+        tester,
+        (_) async => ++calls == 1
+            ? reply('{"anomalies":[]}', source: false)
+            : http.Response('overloaded', 503),
+        plan: twoBatches,
+      );
+      await startSource(tester);
+      await tester.pumpAndSettle();
+      expect(find.text('本次 AI 核对未发现异常'), findsNothing);
+      expect(find.textContaining('结果不完整'), findsOneWidget);
+      expect(find.text('重试未完成批次'), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'unstructured model text is not displayed or counted as a completed review',
+    (tester) async {
+      await prepare(
+        tester,
+        (_) async => reply('REASONING AND MATCHING ROWS', source: false),
+      );
+      await startSource(tester);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('REASONING AND MATCHING ROWS'), findsNothing);
+      expect(find.textContaining('AI 未返回有效的异常清单'), findsOneWidget);
+      expect(find.textContaining('全部 1 批分析完成'), findsNothing);
+      expect(find.text('重试未完成批次'), findsOneWidget);
+    },
+  );
 }

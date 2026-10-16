@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'core/models.dart';
 import 'services/background_tasks.dart';
 import 'services/ai_service.dart';
+import 'services/ai_findings.dart';
 import 'services/report_export.dart';
 import 'services/source_analysis.dart';
 import 'ui/design.dart';
@@ -73,6 +74,12 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   List<SourceAnalysisBatch> sourceBatches = [];
   bool aiSourceMode = true;
   String sourceAiText = '', connectionText = '';
+  List<AiFinding> sourceFindings = [];
+  AiStage aiStage = AiStage.idle;
+  AiStage sourceStage = AiStage.idle;
+  int receivedCharacters = 0;
+  DateTime? aiStartedAt;
+  String sourceNotice = '';
   late String language;
   late ThemeAccent accent;
   String aiText = '', activity = '就绪 · 文件在本机核对', error = '';
@@ -170,6 +177,12 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     selected = null;
     aiText = '';
     sourceAiText = '';
+    sourceFindings = [];
+    sourceNotice = '';
+    aiStage = AiStage.idle;
+    sourceStage = AiStage.idle;
+    receivedCharacters = 0;
+    aiStartedAt = null;
     sourceCompleted = 0;
     sourceTotal = 0;
     sourceBatches = [];
@@ -356,13 +369,30 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     aiBusy = false;
     if (cancelled) {
       if (aiSourceMode) {
-        sourceAiText +=
-            '\n\n${translate('分析已取消，已完成 $sourceCompleted / $sourceTotal 批，结果不完整。', language)}';
+        sourceNotice = translate(
+          '分析已取消，已完成 $sourceCompleted / $sourceTotal 批，结果不完整。',
+          language,
+        );
       } else {
         aiText += '\n${translate('分析已取消', language)}';
       }
       activity = '分析已取消';
+      aiStage = AiStage.cancelled;
+      if (aiSourceMode) sourceStage = AiStage.cancelled;
     }
+  }
+
+  void trackAi(int epoch, AiTransfer transfer) {
+    if (!mounted || epoch != aiEpoch) return;
+    if (aiStage == transfer.stage &&
+        (transfer.characters - receivedCharacters).abs() < 128) {
+      return;
+    }
+    setState(() {
+      aiStage = transfer.stage;
+      if (aiSourceMode) sourceStage = transfer.stage;
+      receivedCharacters = transfer.characters;
+    });
   }
 
   String safeAiError(Object error, AiConfig config) =>
@@ -442,6 +472,11 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     AiService? service;
     setState(() {
       aiBusy = true;
+      if (!test) {
+        aiStage = AiStage.confirming;
+        receivedCharacters = 0;
+        aiStartedAt = null;
+      }
       page = test ? 3 : 2;
       if (test) {
         connectionText = translate('正在测试连接…', language);
@@ -464,11 +499,18 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       }
       service = (widget.aiServiceFactory ?? AiService.new)();
       activeAi = service;
+      if (!test) {
+        setState(() {
+          aiStage = AiStage.connecting;
+          aiStartedAt = DateTime.now();
+        });
+      }
       final text = await service.complete(
         config,
         report: test ? null : currentReport,
         item: item,
         language: requestLanguage,
+        onProgress: test ? null : (transfer) => trackAi(epoch, transfer),
       );
       if (mounted &&
           epoch == aiEpoch &&
@@ -479,6 +521,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           } else {
             aiText = text;
           }
+          if (!test) aiStage = AiStage.complete;
         });
       }
     } catch (e) {
@@ -488,6 +531,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             '调用失败：${safeAiError(e, config)}\n请核对接口地址、模型、密钥与网络；规则核对结果仍然保留。',
             requestLanguage,
           );
+          if (!test) aiStage = AiStage.failed;
           if (test) {
             connectionText = text;
           } else {
@@ -520,11 +564,17 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       page = 2;
       aiSourceMode = true;
       aiBusy = true;
+      aiStage = AiStage.preparing;
+      sourceStage = AiStage.preparing;
+      aiStartedAt = null;
+      receivedCharacters = 0;
+      sourceNotice = '';
       if (!resume) {
         sourceCompleted = 0;
         sourceTotal = 0;
         sourceBatches = [];
         sourceAiText = '';
+        sourceFindings = [];
       }
       activity = '正在准备原始文件分析…';
     });
@@ -547,6 +597,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         '将发送 ${stations.length + 1} 份文件中 ${[inputBom, ...stations].fold(0, (count, file) => count + file.rows.length)} 条物料记录及全部已读取的原始单元格、表头和公式文本，共 $sourceTotal 批。包括排除料、候选料和额外工作表内容；不上传 Excel 二进制文件。',
         requestLanguage,
       );
+      setState(() {
+        aiStage = AiStage.confirming;
+        sourceStage = AiStage.confirming;
+      });
       final confirmed = await confirmAi(
         config,
         '发送原始文件内容至 AI',
@@ -560,26 +614,30 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             sourceBatches = [];
           }
           activity = '已取消发送';
+          aiStage = AiStage.cancelled;
+          sourceStage = AiStage.cancelled;
         });
         return;
       }
       service = (widget.aiServiceFactory ?? AiService.new)();
       activeAi = service;
-      if (resume) {
-        setState(
-          () =>
-              sourceAiText += '\n\n${translate('继续未完成批次', requestLanguage)}\n',
-        );
-      }
+      setState(() => aiStartedAt = DateTime.now());
       for (var index = sourceCompleted; index < sourceBatches.length; index++) {
         final batch = sourceBatches[index];
-        String text;
+        setState(() {
+          aiStage = AiStage.connecting;
+          sourceStage = AiStage.connecting;
+          receivedCharacters = 0;
+        });
+        List<AiFinding> findings;
         try {
-          text = await service!.analyzeSourceBatch(
+          final text = await service!.analyzeSourceBatch(
             config,
             batch,
             language: requestLanguage,
+            onProgress: (transfer) => trackAi(epoch, transfer),
           );
+          findings = parseAiFindings(text);
         } on AiRequestException catch (e) {
           if (!mounted || epoch != aiEpoch) return;
           final smaller = e.canSplitBatch ? batch.split() : null;
@@ -596,29 +654,38 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           continue;
         }
         if (!mounted || epoch != aiEpoch) return;
-        final scopeLabel = switch (batch.kind) {
-          'parts' => '物料字段核对',
-          'worksheet_context' => '工作表原文审阅',
-          _ => '位号归属复核',
-        };
         setState(() {
           sourceCompleted = index + 1;
-          sourceAiText +=
-              '${sourceAiText.isEmpty ? '' : '\n\n'}${translate('第 ${index + 1} / $sourceTotal 批', requestLanguage)} · ${translate(scopeLabel, requestLanguage)}\n$text';
+          final identities = sourceFindings.map((f) => f.identity).toSet();
+          sourceFindings.addAll(
+            findings.where((finding) => identities.add(finding.identity)),
+          );
+          sourceAiText = sourceFindings.map((f) => f.toText()).join('\n\n');
         });
       }
       if (mounted && epoch == aiEpoch) {
         setState(() {
-          sourceAiText +=
-              '\n\n${translate('全部 $sourceTotal 批分析完成。AI 结论供复核，不改变本地核对状态。', requestLanguage)}';
+          sourceNotice = translate(
+            '全部 $sourceTotal 批分析完成。AI 结论供复核，不改变本地核对状态。',
+            requestLanguage,
+          );
+          if (sourceFindings.isEmpty) {
+            sourceAiText = translate('本次 AI 核对未发现异常', requestLanguage);
+          }
+          aiStage = AiStage.complete;
+          sourceStage = AiStage.complete;
           activity = '原始文件 AI 核对完成';
         });
       }
     } catch (e) {
       if (mounted && epoch == aiEpoch) {
         setState(() {
-          sourceAiText +=
-              '\n\n${translate('原始文件分析中断，已完成 $sourceCompleted / $sourceTotal 批，结果不完整：${safeAiError(e, config)}', requestLanguage)}';
+          sourceNotice = translate(
+            '原始文件分析中断，已完成 $sourceCompleted / $sourceTotal 批，结果不完整：${safeAiError(e, config)}',
+            requestLanguage,
+          );
+          aiStage = AiStage.failed;
+          sourceStage = AiStage.failed;
           activity = '原始文件 AI 分析失败';
         });
       }
@@ -974,6 +1041,12 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     total: sourceTotal,
     files: sourceFiles,
     result: aiSourceMode ? sourceAiText : aiText,
+    findings: sourceFindings,
+    stage: aiSourceMode ? sourceStage : aiStage,
+    runId: aiEpoch,
+    characters: receivedCharacters,
+    startedAt: aiStartedAt,
+    notice: aiSourceMode ? sourceNotice : '',
     onMode: (value) => setState(() => aiSourceMode = value),
     onRun: () {
       if (aiSourceMode) {

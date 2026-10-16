@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
+import '../services/ai_findings.dart';
+import 'ai_activity.dart';
+import 'ai_findings_view.dart';
 import 'design.dart';
 import 'localized_text.dart';
 
@@ -9,6 +12,11 @@ class AiWorkbench extends StatelessWidget {
   final int completed, total;
   final List<ImportedFile> files;
   final String result;
+  final List<AiFinding> findings;
+  final AiStage stage;
+  final int runId, characters;
+  final String notice;
+  final DateTime? startedAt;
   final ValueChanged<bool> onMode;
   final VoidCallback onRun, onCancel, onSettings, onCopy;
   final VoidCallback? onResume;
@@ -28,6 +36,12 @@ class AiWorkbench extends StatelessWidget {
     required this.onSettings,
     required this.onCopy,
     this.onResume,
+    this.findings = const [],
+    this.stage = AiStage.idle,
+    this.runId = 0,
+    this.characters = 0,
+    this.notice = '',
+    this.startedAt,
   });
   @override
   Widget build(BuildContext context) {
@@ -74,16 +88,34 @@ class AiWorkbench extends StatelessWidget {
                         : '依据本地核对结果解释异常；AI 建议不会改变本地核对状态。',
                   ),
                   const SizedBox(height: 8),
-                  for (final f in files)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '${f.kind == InputKind.bom ? 'BOM' : 'SMT'}  ${f.name}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      for (final f in files)
+                        Tooltip(
+                          message: f.path,
+                          child: Container(
+                            constraints: const BoxConstraints(maxWidth: 440),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 7,
+                            ),
+                            decoration: BoxDecoration(
+                              color: p.panel,
+                              border: Border.all(color: p.line),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              '${f.kind == InputKind.bom ? 'BOM' : 'SMT'}  ${f.name}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 11, color: p.muted),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   if (files.isEmpty) caption(context, '请在核对工作台导入原始文件'),
                   const SizedBox(height: 10),
                   Wrap(
@@ -105,11 +137,6 @@ class AiWorkbench extends StatelessWidget {
                           icon: Icons.refresh,
                           onPressed: onResume,
                         ),
-                      if (sourceMode && total > 0)
-                        LText(
-                          '已完成 $completed / $total 批',
-                          style: TextStyle(fontSize: 12, color: p.muted),
-                        ),
                     ],
                   ),
                 ],
@@ -118,14 +145,16 @@ class AiWorkbench extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        if (busy) ...[
-          caption(context, '正在等待 AI 返回当前批次，可取消；每批最多等待 5 分钟。'),
-          const SizedBox(height: 6),
-          LinearProgressIndicator(
-            value: sourceMode && total > 0 ? completed / total : null,
-            minHeight: 2,
-            color: p.accent,
-            backgroundColor: p.line,
+        if (busy || (sourceMode && notice.isNotEmpty)) ...[
+          AiActivity(
+            key: ValueKey(runId),
+            busy: busy,
+            stage: stage,
+            completed: sourceMode ? completed : 0,
+            total: sourceMode ? total : 0,
+            characters: characters,
+            startedAt: startedAt,
+            notice: sourceMode ? notice : '',
           ),
           const SizedBox(height: 10),
         ],
@@ -144,7 +173,7 @@ class AiWorkbench extends StatelessWidget {
                     children: [
                       Expanded(
                         child: LText(
-                          sourceMode ? '原始文件 AI 核对结果' : 'AI 分析结果',
+                          sourceMode ? '异常结果 (${findings.length})' : 'AI 分析结果',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
@@ -161,19 +190,28 @@ class AiWorkbench extends StatelessWidget {
                 ),
                 const Divider(height: 1),
                 Expanded(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(18),
-                    child: SelectableText(
-                      result.isEmpty
-                          ? localText(context, '尚未开始分析。配置接口后，选择分析方式并发送。')
-                          : result,
-                      style: TextStyle(
-                        fontSize: 13,
-                        height: 1.8,
-                        color: p.text,
-                      ),
-                    ),
-                  ),
+                  child: sourceMode
+                      ? AiFindingsView(
+                          findings: findings,
+                          complete:
+                              stage == AiStage.complete &&
+                              total > 0 &&
+                              completed == total,
+                          busy: busy,
+                        )
+                      : SingleChildScrollView(
+                          padding: const EdgeInsets.all(18),
+                          child: SelectableText(
+                            result.isEmpty
+                                ? localText(context, '尚未开始分析。配置接口后，选择分析方式并发送。')
+                                : result,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.8,
+                              color: p.text,
+                            ),
+                          ),
+                        ),
                 ),
               ],
             ),

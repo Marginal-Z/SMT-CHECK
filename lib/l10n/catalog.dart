@@ -1,5 +1,41 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  'AI 未返回有效的异常清单，本批未完成，请重试未完成批次。': [
+    'AI did not return a valid anomaly list. This batch is incomplete; retry unfinished batches.',
+    'AI ไม่ได้ส่งรายการผิดปกติที่ถูกต้อง ชุดนี้ยังไม่เสร็จ โปรดลองชุดที่ยังไม่เสร็จอีกครั้ง',
+  ],
+  '正在整理原文件': ['Preparing original files', 'กำลังเตรียมไฟล์ต้นฉบับ'],
+  '等待确认发送': ['Waiting for send confirmation', 'รอยืนยันการส่ง'],
+  '已发起请求，等待模型响应': [
+    'Request sent; waiting for the model',
+    'ส่งคำขอแล้ว กำลังรอโมเดลตอบกลับ',
+  ],
+  '模型正在分析原文件': [
+    'The model is analyzing original files',
+    'โมเดลกำลังวิเคราะห์ไฟล์ต้นฉบับ',
+  ],
+  '正在接收异常清单': ['Receiving anomaly results', 'กำลังรับรายการผิดปกติ'],
+  '核对完成': ['Verification complete', 'ตรวจสอบเสร็จแล้ว'],
+  '核对中断': ['Verification interrupted', 'การตรวจสอบหยุดชะงัก'],
+  '等待开始核对': ['Ready to verify', 'พร้อมเริ่มตรวจสอบ'],
+  '已用时': ['Elapsed', 'เวลาที่ใช้'],
+  '本批已接收 {count} 字符': [
+    'Received {count} characters for this batch',
+    'รับข้อมูลชุดนี้แล้ว {count} อักขระ',
+  ],
+  '异常结果 ({count})': ['Anomalies ({count})', 'รายการผิดปกติ ({count})'],
+  '本次 AI 核对未发现异常': [
+    'No anomalies found in this AI review',
+    'การตรวจสอบ AI ครั้งนี้ไม่พบความผิดปกติ',
+  ],
+  '核对进行中，发现的异常将在这里显示': [
+    'Verification is running. Detected anomalies will appear here.',
+    'กำลังตรวจสอบ รายการผิดปกติที่พบจะแสดงที่นี่',
+  ],
+  '开始核对后，这里只显示异常记录': [
+    'Start verification to see anomaly records here.',
+    'เริ่มตรวจสอบเพื่อแสดงเฉพาะรายการผิดปกติที่นี่',
+  ],
   '原始文件较大时建议每批 12000 或 24000 字符；超时后会自动拆小重试。': [
     'For larger files, use 12000 or 24000 characters per batch. Timed-out batches are automatically split and retried.',
     'สำหรับไฟล์ขนาดใหญ่ แนะนำ 12000 หรือ 24000 อักขระต่อชุด หากหมดเวลาระบบจะแบ่งชุดให้เล็กลงแล้วลองใหม่',

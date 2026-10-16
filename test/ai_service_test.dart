@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:smt_check/services/ai_service.dart';
+import 'package:smt_check/services/ai_findings.dart';
 
 void main() {
   test('base URLs normalized without duplicating chat endpoint', () {
@@ -146,6 +147,7 @@ void main() {
     ],
   };
   test('SSE handles keepalives, reasoning, UTF8 chunk boundaries and completion', () async {
+    final progress = <AiTransfer>[];
     final wire =
         ': keep-alive\n\n${event({
           'choices': [
@@ -167,7 +169,16 @@ void main() {
       }),
     );
     addTearDown(service.close);
-    expect(await service.complete(config), '原始核对结果');
+    expect(await service.complete(config, onProgress: progress.add), '原始核对结果');
+    expect(
+      progress.map((p) => p.stage),
+      containsAllInOrder([
+        AiStage.connecting,
+        AiStage.thinking,
+        AiStage.receiving,
+      ]),
+    );
+    expect(progress.last.characters, 6);
   });
   test('explicitly unsupported streaming falls back once to JSON', () async {
     final modes = <bool>[];

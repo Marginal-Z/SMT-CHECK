@@ -202,7 +202,7 @@ class DesktopShell extends StatelessWidget {
                       style: TextStyle(fontSize: 11, color: p.muted),
                     ),
                   ),
-                  const Text('SMT-CHECK 1.4.1', style: TextStyle(fontSize: 10)),
+                  const Text('SMT-CHECK 1.5.0', style: TextStyle(fontSize: 10)),
                 ],
               ),
             ),
@@ -238,11 +238,6 @@ class FileStrip extends StatelessWidget {
       final (label, file, action, index) = entry;
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-        decoration: BoxDecoration(
-          color: p.panel,
-          border: Border.all(color: p.line),
-          borderRadius: BorderRadius.circular(3),
-        ),
         child: Row(
           children: [
             SizedBox(
@@ -291,24 +286,31 @@ class FileStrip extends StatelessWidget {
       );
     }
 
-    return LayoutBuilder(
-      builder: (context, c) => c.maxWidth >= 1000
-          ? Row(
-              children: [
-                for (var i = 0; i < entries.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 8),
-                  Expanded(child: slot(entries[i])),
+    return Container(
+      decoration: BoxDecoration(
+        color: p.panel,
+        border: Border.all(color: p.line),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: LayoutBuilder(
+        builder: (context, c) => c.maxWidth >= 1000
+            ? Row(
+                children: [
+                  for (var i = 0; i < entries.length; i++) ...[
+                    if (i > 0) Container(width: 1, height: 34, color: p.line),
+                    Expanded(child: slot(entries[i])),
+                  ],
                 ],
-              ],
-            )
-          : Column(
-              children: [
-                for (var i = 0; i < entries.length; i++) ...[
-                  if (i > 0) const SizedBox(height: 6),
-                  slot(entries[i]),
+              )
+            : Column(
+                children: [
+                  for (var i = 0; i < entries.length; i++) ...[
+                    if (i > 0) Divider(height: 1, color: p.line),
+                    slot(entries[i]),
+                  ],
                 ],
-              ],
-            ),
+              ),
+      ),
     );
   }
 }
@@ -318,9 +320,9 @@ class SummaryStrip extends StatelessWidget {
   const SummaryStrip({super.key, required this.report});
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 10),
+    padding: const EdgeInsets.symmetric(vertical: 14),
     child: Wrap(
-      spacing: 26,
+      spacing: 38,
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
@@ -329,9 +331,10 @@ class SummaryStrip extends StatelessWidget {
           ('BOM料号数量', report.bomPartCount),
           ('SMT站位表料号数量', report.smtPartCount),
         ])
-          Row(
+          Column(
             key: ValueKey('stat-$label'),
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               LText(
                 label,
@@ -340,11 +343,11 @@ class SummaryStrip extends StatelessWidget {
                   color: Palette.of(context).muted,
                 ),
               ),
-              const SizedBox(width: 9),
+              const SizedBox(height: 4),
               Text(
                 '$value',
                 style: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 24,
                   fontWeight: FontWeight.w700,
                 ),
               ),

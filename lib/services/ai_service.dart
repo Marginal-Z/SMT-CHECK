@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../core/models.dart';
 import 'source_analysis.dart';
+import 'ai_findings.dart';
 
 class AiConfig {
   final String baseUrl, model, apiKey;
@@ -61,6 +62,7 @@ class AiService {
     CheckReport? report,
     CheckItem? item,
     String language = 'zh',
+    void Function(AiTransfer)? onProgress,
   }) async {
     final records = item != null
         ? [item]
@@ -79,33 +81,48 @@ class AiService {
     if (content.length > 120000) {
       throw const FormatException('本次异常内容过长，请选中单个料号后分析。');
     }
-    return _request(config, content, language);
+    return _request(config, content, language, onProgress: onProgress);
   }
 
   Future<String> analyzeSourceBatch(
     AiConfig config,
     SourceAnalysisBatch batch, {
     String language = 'zh',
+    void Function(AiTransfer)? onProgress,
   }) => _request(
     config,
     jsonEncode({
-      'task': '直接核对原始T100-BOM和SMT站位表。逐料号核对料件编号/料号、品名/物料描述、组成用量/数量、插件位置/位号。跨A/B汇总同料号；报告双向缺料、多料、描述、数量和位号差异，引用文件名、工作表、原始行号及原文。一致项简要列料号和结论，异常项详细列证据和原因，不要重复抄录全部原文。按给定关键词注明非贴片排除原因，但仍审计其原文。候选替代料不自动认定已批准。单站位表不代表整板覆盖。scope=parts只评价本批料号；worksheet_context检查表头、额外行、缺失表头工作表和公式信息，不将上下文批次误称完整BOM；position_ownership核对跨行/跨料号位号归属。说明证据、异常原因与待确认事项，不编造已核实结论，不因未提供某批数据判断全文件缺失。',
+      'task': '直接核对原始T100-BOM和SMT站位表的料件编号/料号、品名/物料描述、组成用量/数量、插件位置/位号。跨A/B汇总同料号，核查双向缺料、多料、描述、数量、位号差异。只输出发现的异常，不输出一致项、正常排除项、推理过程、操作建议或批次总结。按给定关键词识别非贴片排除；候选替代料不自动视为获批。单站位表不代表整板覆盖。scope=parts只核对此批料号；worksheet_context只核查表头、额外行、工作表和公式文本；position_ownership核查位号归属，避免与物料字段异常重复。引用提供的文件名、工作表和行号，不编造资料，不因其他批次未提供而判断全文件缺失。最终严格返回一个JSON对象，结构为 {"anomalies":[{"part":"异常料号或工作表名称","category":"异常类型","reason":"具体异常原因或待确认差异","bom":"BOM原始证据","smt":"SMT原始证据","source":"文件名、工作表及行号"}]}。所有字段为字符串；没有异常时返回 {"anomalies":[]}。不要Markdown代码块，不得列入通过或正常排除记录。',
       'sourceData': jsonDecode(batch.payload),
     }),
     language,
+    onProgress: onProgress,
   );
 
   Future<String> _request(
     AiConfig config,
     String content,
-    String language,
-  ) async {
+    String language, {
+    void Function(AiTransfer)? onProgress,
+  }) async {
     Future<String> sendCompatible() async {
       try {
-        return await _send(config, content, language, stream: true);
+        return await _send(
+          config,
+          content,
+          language,
+          stream: true,
+          onProgress: onProgress,
+        );
       } on AiRequestException catch (e) {
         if (!e.streamUnsupported) rethrow;
-        return _send(config, content, language, stream: false);
+        return _send(
+          config,
+          content,
+          language,
+          stream: false,
+          onProgress: onProgress,
+        );
       }
     }
 
@@ -127,6 +144,7 @@ class AiService {
     String content,
     String language, {
     required bool stream,
+    void Function(AiTransfer)? onProgress,
   }) async {
     String redact(String s) => config.apiKey.trim().isEmpty
         ? s
@@ -154,6 +172,7 @@ class AiService {
           {'role': 'user', 'content': content},
         ],
       });
+    onProgress?.call(const AiTransfer(AiStage.connecting));
     final response = await client.send(request);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       var detail = '';
@@ -248,7 +267,16 @@ class AiService {
         final reason = finish(choice);
         if (reason.isNotEmpty) finished = true;
         final delta = choice['delta'] ?? choice['message'];
-        if (delta is Map) result.write(textContent(delta['content']));
+        if (delta is Map) {
+          final text = textContent(delta['content']);
+          if (text.isNotEmpty) {
+            result.write(text);
+            onProgress?.call(AiTransfer(AiStage.receiving, result.length));
+          } else if (delta['reasoning_content'] is String &&
+              (delta['reasoning_content'] as String).isNotEmpty) {
+            onProgress?.call(AiTransfer(AiStage.thinking, result.length));
+          }
+        }
       }
 
       await for (final line in lines) {
@@ -295,7 +323,9 @@ class AiService {
         text = textContent(message['content']);
       }
     }
-    return checked(text ?? '');
+    final finalText = checked(text ?? '');
+    onProgress?.call(AiTransfer(AiStage.receiving, finalText.length));
+    return finalText;
   }
 
   void close() => client.close();

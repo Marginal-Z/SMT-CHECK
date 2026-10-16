@@ -54,82 +54,66 @@ class _ResultsViewState extends State<ResultsView> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Wrap(
-          spacing: 6,
+          alignment: WrapAlignment.spaceBetween,
+          spacing: 12,
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            for (final (label, status) in [
-              ('全部', null),
-              ('异常', CheckStatus.error),
-              ('一致', CheckStatus.pass),
-              ('已排除物料', CheckStatus.excluded),
-              ('候选料', CheckStatus.candidate),
-            ])
-              FilterTab(
-                '${localText(context, label)} (${status == null ? widget.report.items.length : widget.report.count(status)})',
-                selected: filter == status,
-                onPressed: () => setState(() => filter = status),
-              ),
-            SizedBox(
-              width: 200,
-              child: TextField(
-                onChanged: (v) => setState(() => query = v),
-                style: const TextStyle(fontSize: 12),
-                decoration: InputDecoration(
-                  hintText: localText(context, '搜索料号、位号或原因'),
-                  prefixIcon: Icon(Icons.search, size: 17),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 9,
-                  ),
-                ),
-              ),
-            ),
-            DeskButton(
-              '导出 CSV',
-              icon: Icons.download_outlined,
-              onPressed: () => widget.onExport(false),
-            ),
-            DeskButton('JSON', onPressed: () => widget.onExport(true)),
-            DeskButton(
-              detailsOpen ? '收起详情' : '展开详情',
-              icon: Icons.vertical_split_outlined,
-              onPressed: widget.selected == null
-                  ? null
-                  : () => setState(() => detailsOpen = !detailsOpen),
-            ),
-          ],
-        ),
-        if (widget.selected != null) ...[
-          const SizedBox(height: 8),
-          Container(
-            key: const Key('current-selection'),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: p.accentSoft,
-              border: Border.all(color: p.accent),
-              borderRadius: BorderRadius.circular(3),
-            ),
-            child: Row(
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
               children: [
-                Icon(Icons.arrow_right_alt, color: p.accent, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '${localText(context, '当前选中料号')}：${widget.selected!.part}${list.contains(widget.selected) ? '' : ' · ${localText(context, '已被筛选隐藏')}'}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: p.accent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                for (final (label, status) in [
+                  ('全部', null),
+                  ('异常', CheckStatus.error),
+                  ('一致', CheckStatus.pass),
+                  ('已排除物料', CheckStatus.excluded),
+                  ('候选料', CheckStatus.candidate),
+                ])
+                  FilterTab(
+                    '${localText(context, label)} (${status == null ? widget.report.items.length : widget.report.count(status)})',
+                    selected: filter == status,
+                    onPressed: () => setState(() => filter = status),
+                  ),
+              ],
+            ),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: 200,
+                  child: TextField(
+                    onChanged: (v) => setState(() => query = v),
+                    style: const TextStyle(fontSize: 12),
+                    decoration: InputDecoration(
+                      hintText: localText(context, '搜索料号、位号或原因'),
+                      prefixIcon: Icon(Icons.search, size: 17),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 9,
+                      ),
                     ),
                   ),
                 ),
+                DeskButton(
+                  '导出 CSV',
+                  icon: Icons.download_outlined,
+                  onPressed: () => widget.onExport(false),
+                ),
+                DeskButton('JSON', onPressed: () => widget.onExport(true)),
+                DeskButton(
+                  detailsOpen ? '收起详情' : '展开详情',
+                  icon: Icons.vertical_split_outlined,
+                  onPressed: widget.selected == null
+                      ? null
+                      : () => setState(() => detailsOpen = !detailsOpen),
+                ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
         const SizedBox(height: 10),
         Expanded(
           child: LayoutBuilder(
@@ -251,33 +235,17 @@ class _ResultsViewState extends State<ResultsView> {
                                                           color: colors.fill,
                                                           border: Border(
                                                             left: BorderSide(
-                                                              color:
-                                                                  colors.edge,
-                                                              width: 5,
-                                                            ),
-                                                            top: BorderSide(
                                                               color: isSelected
-                                                                  ? p.accent
-                                                                  : Colors
-                                                                        .transparent,
-                                                              width: 2,
-                                                            ),
-                                                            right: BorderSide(
-                                                              color: isSelected
-                                                                  ? p.accent
-                                                                  : Colors
-                                                                        .transparent,
-                                                              width: 2,
+                                                                  ? p.text
+                                                                  : colors.edge,
+                                                              width: 4,
                                                             ),
                                                             bottom: BorderSide(
-                                                              color: isSelected
-                                                                  ? p.accent
-                                                                  : colors.edge
-                                                                        .withValues(
-                                                                          alpha:
-                                                                              .35,
-                                                                        ),
-                                                              width: 2,
+                                                              color: p.panel
+                                                                  .withValues(
+                                                                    alpha: .55,
+                                                                  ),
+                                                              width: 1,
                                                             ),
                                                           ),
                                                         ),
@@ -378,9 +346,25 @@ class _ResultsViewState extends State<ResultsView> {
           ),
         ),
         const SizedBox(height: 6),
-        caption(
-          context,
-          '显示 ${list.length} / ${widget.report.items.length} 条记录 · 点击行查看完整差异 · 已排除和候选料单独统计',
+        Wrap(
+          spacing: 18,
+          runSpacing: 4,
+          children: [
+            caption(
+              context,
+              '显示 ${list.length} / ${widget.report.items.length} 条记录 · 点击行查看完整差异 · 已排除和候选料单独统计',
+            ),
+            if (widget.selected != null)
+              Text(
+                '${localText(context, '当前选中料号')}：${widget.selected!.part}${list.contains(widget.selected) ? '' : ' · ${localText(context, '已被筛选隐藏')}'}',
+                key: const Key('current-selection'),
+                style: TextStyle(
+                  color: p.text,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+          ],
         ),
       ],
     );
@@ -410,19 +394,11 @@ class _ResultsViewState extends State<ResultsView> {
         SizedBox(
           width: 30,
           child: selected
-              ? Container(
+              ? Icon(
                   key: const Key('selected-row-marker'),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  padding: const EdgeInsets.symmetric(vertical: 7),
-                  decoration: BoxDecoration(
-                    color: Palette.of(context).accent,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                  child: Icon(
-                    Icons.arrow_right,
-                    size: 20,
-                    color: Palette.of(context).onAccent,
-                  ),
+                  Icons.radio_button_checked,
+                  size: 16,
+                  color: Palette.of(context).text,
                 )
               : null,
         ),
@@ -449,7 +425,9 @@ class _ResultsViewState extends State<ResultsView> {
                         style: TextStyle(
                           fontSize: header ? 11 : 12,
                           height: 1.55,
-                          fontWeight: header || i == 1
+                          fontWeight: selected && i == 1
+                              ? FontWeight.w800
+                              : header || i == 1
                               ? FontWeight.w600
                               : FontWeight.w400,
                           color: i == 0
