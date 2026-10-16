@@ -112,7 +112,7 @@ class _ResultsViewState extends State<ResultsView> {
                     child: LayoutBuilder(
                       builder: (context, tableConstraints) {
                         final tableWidth = math.max(
-                          1442.0,
+                          1478.0,
                           tableConstraints.maxWidth - 2,
                         );
                         return Container(
@@ -171,14 +171,10 @@ class _ResultsViewState extends State<ResultsView> {
                                                       isSelected =
                                                           widget.selected ==
                                                           item;
-                                                  final color =
-                                                      item.status ==
-                                                          CheckStatus.pass
-                                                      ? good
-                                                      : item.status ==
-                                                            CheckStatus.error
-                                                      ? bad
-                                                      : p.muted;
+                                                  final colors = p.result(
+                                                    item.status,
+                                                    selected: isSelected,
+                                                  );
                                                   return Semantics(
                                                     button: true,
                                                     label:
@@ -219,31 +215,27 @@ class _ResultsViewState extends State<ResultsView> {
                                                         }
                                                       },
                                                       child: Container(
-                                                        decoration:
-                                                            BoxDecoration(
-                                                              color: color
-                                                                  .withValues(
-                                                                    alpha:
-                                                                        p.dark
-                                                                        ? .10
-                                                                        : .045,
-                                                                  ),
-                                                              border: Border(
-                                                                left: BorderSide(
-                                                                  color:
-                                                                      isSelected
-                                                                      ? p.text
-                                                                      : color,
-                                                                  width: 3,
-                                                                ),
-                                                                bottom:
-                                                                    BorderSide(
-                                                                      color: p
-                                                                          .line,
-                                                                      width: .6,
-                                                                    ),
-                                                              ),
+                                                        key: ObjectKey(item),
+                                                        decoration: BoxDecoration(
+                                                          color: colors.fill,
+                                                          border: Border(
+                                                            left: BorderSide(
+                                                              color:
+                                                                  colors.edge,
+                                                              width: 5,
                                                             ),
+                                                            bottom: BorderSide(
+                                                              color: isSelected
+                                                                  ? p.accent
+                                                                  : colors.edge
+                                                                        .withValues(
+                                                                          alpha:
+                                                                              .35,
+                                                                        ),
+                                                              width: 1,
+                                                            ),
+                                                          ),
+                                                        ),
                                                         child: rowCells(
                                                           context,
                                                           [
@@ -268,7 +260,8 @@ class _ResultsViewState extends State<ResultsView> {
                                                                 )
                                                                 .join('；'),
                                                           ],
-                                                          color: color,
+                                                          color: colors.ink,
+                                                          status: item.status,
                                                           width: tableWidth,
                                                         ),
                                                       ),
@@ -352,9 +345,19 @@ class _ResultsViewState extends State<ResultsView> {
     List<String> values, {
     bool header = false,
     Color? color,
+    CheckStatus? status,
     required double width,
   }) {
-    final widths = [96.0, 180.0, 220.0, 80.0, 80.0, 210.0, 210.0, width - 1082];
+    final widths = [
+      128.0,
+      180.0,
+      220.0,
+      80.0,
+      80.0,
+      210.0,
+      210.0,
+      width - 1118,
+    ];
     return Row(
       children: [
         for (var i = 0; i < values.length; i++)
@@ -366,23 +369,30 @@ class _ResultsViewState extends State<ResultsView> {
                 message: header || i == 0
                     ? localText(context, values[i])
                     : values[i],
-                child: Text(
-                  header || i == 0 ? localText(context, values[i]) : values[i],
-                  maxLines: header ? 1 : 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: header ? 11 : 12,
-                    height: 1.55,
-                    fontWeight: header || i == 1
-                        ? FontWeight.w600
-                        : FontWeight.w400,
-                    color: i == 0
-                        ? color
-                        : header
-                        ? Palette.of(context).muted
-                        : Palette.of(context).text,
-                  ),
-                ),
+                child:
+                    i == 0 &&
+                        (status == CheckStatus.pass ||
+                            status == CheckStatus.error)
+                    ? ResultBadge(status: status!, label: values[i])
+                    : Text(
+                        header || i == 0
+                            ? localText(context, values[i])
+                            : values[i],
+                        maxLines: header ? 1 : 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: header ? 11 : 12,
+                          height: 1.55,
+                          fontWeight: header || i == 1
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                          color: i == 0
+                              ? color
+                              : header
+                              ? Palette.of(context).muted
+                              : Palette.of(context).text,
+                        ),
+                      ),
               ),
             ),
           ),
@@ -397,24 +407,13 @@ class ItemDetail extends StatelessWidget {
   const ItemDetail({super.key, required this.item, required this.onAi});
   @override
   Widget build(BuildContext context) {
-    final color = item.status == CheckStatus.error
-        ? bad
-        : item.status == CheckStatus.pass
-        ? good
-        : Palette.of(context).muted;
+    final color = Palette.of(context).result(item.status).ink;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          LText(
-            item.label,
-            style: TextStyle(
-              fontSize: 11,
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          ResultBadge(status: item.status, label: item.label),
           const SizedBox(height: 9),
           SelectableText(
             item.part.isEmpty ? localText(context, '空料号') : item.part,

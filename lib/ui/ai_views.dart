@@ -114,7 +114,7 @@ class AiWorkbench extends StatelessWidget {
           LinearProgressIndicator(
             value: sourceMode && total > 0 ? completed / total : null,
             minHeight: 2,
-            color: p.text,
+            color: p.accent,
             backgroundColor: p.line,
           ),
           const SizedBox(height: 10),
@@ -182,6 +182,8 @@ class AiSettingsPanel extends StatelessWidget {
   final bool busy;
   final String connection;
   final ValueChanged<int> onLimit;
+  final ThemeAccent accent;
+  final ValueChanged<ThemeAccent> onAccent;
   final VoidCallback onSave, onTest;
   const AiSettingsPanel({
     super.key,
@@ -192,6 +194,8 @@ class AiSettingsPanel extends StatelessWidget {
     required this.busy,
     required this.connection,
     required this.onLimit,
+    required this.accent,
+    required this.onAccent,
     required this.onSave,
     required this.onTest,
   });
@@ -209,8 +213,85 @@ class AiSettingsPanel extends StatelessWidget {
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
-            caption(context, '兼容 Chat Completions 的 AI 接口'),
+            caption(context, '外观与 AI 接口'),
             const SizedBox(height: 22),
+            Pane(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const LText(
+                    '外观',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  const LText('主题色', style: TextStyle(fontSize: 13)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final choice in ThemeAccent.values)
+                        Semantics(
+                          selected: choice == accent,
+                          child: OutlinedButton(
+                            key: ValueKey('theme-color-${choice.name}'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Palette.of(context).text,
+                              backgroundColor: choice == accent
+                                  ? Palette.of(context).accentSoft
+                                  : Palette.of(context).panel,
+                              side: BorderSide(
+                                color: choice == accent
+                                    ? Palette.of(context).accent
+                                    : Palette.of(context).line,
+                                width: choice == accent ? 2 : 1,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                            ),
+                            onPressed: () => onAccent(choice),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    color: Palette(false, choice).accent,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: choice == ThemeAccent.black
+                                          ? Palette.of(context).muted
+                                          : Colors.transparent,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                LText(
+                                  choice.label,
+                                  style: const TextStyle(fontSize: 12),
+                                ),
+                                if (choice == accent) ...[
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.check, size: 14),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  caption(context, '主题色即时生效并自动保存；一致为绿色，异常为红色。'),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             Pane(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

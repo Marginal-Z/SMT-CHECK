@@ -123,6 +123,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('ai-url')), findsOneWidget);
       await tester.enterText(find.byKey(const Key('ai-key')), 'session-secret');
+      await tester.ensureVisible(find.text('保存设置'));
       await tester.tap(find.text('保存设置'));
       await tester.pumpAndSettle();
       final prefs = await SharedPreferences.getInstance();
@@ -132,6 +133,7 @@ void main() {
         prefs.getKeys().any((k) => k.toLowerCase().contains('key')),
         isFalse,
       );
+      await tester.ensureVisible(find.text('测试连接'));
       await tester.tap(find.text('测试连接'));
       await tester.pumpAndSettle();
       expect(find.text('CONNECTED'), findsOneWidget);

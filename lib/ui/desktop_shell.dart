@@ -45,19 +45,13 @@ class DesktopShell extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Container(
+                  Image.asset(
+                    'assets/icons/app_icon.png',
+                    key: const Key('brand-icon'),
                     width: 28,
                     height: 28,
-                    alignment: Alignment.center,
-                    color: p.text,
-                    child: Text(
-                      'SC',
-                      style: TextStyle(
-                        color: p.panel,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
+                    filterQuality: FilterQuality.high,
+                    semanticLabel: 'SMT-CHECK',
                   ),
                   const SizedBox(width: 8),
                   SizedBox(
@@ -91,7 +85,7 @@ class DesktopShell extends StatelessWidget {
                                     border: Border(
                                       bottom: BorderSide(
                                         color: page == i
-                                            ? p.text
+                                            ? p.accent
                                             : Colors.transparent,
                                         width: 2,
                                       ),
@@ -100,10 +94,10 @@ class DesktopShell extends StatelessWidget {
                                   child: TextButton(
                                     style: TextButton.styleFrom(
                                       foregroundColor: page == i
-                                          ? p.text
+                                          ? p.accent
                                           : p.muted,
                                       backgroundColor: page == i
-                                          ? p.hover
+                                          ? p.accentSoft
                                           : Colors.transparent,
                                       minimumSize: Size(compact ? 32 : 80, 44),
                                       tapTargetSize:
@@ -197,7 +191,7 @@ class DesktopShell extends StatelessWidget {
                         ? Icons.error_outline
                         : Icons.check_circle_outline,
                     size: 12,
-                    color: hasError ? bad : p.muted,
+                    color: hasError ? p.result(CheckStatus.error).ink : p.muted,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
@@ -208,7 +202,7 @@ class DesktopShell extends StatelessWidget {
                       style: TextStyle(fontSize: 11, color: p.muted),
                     ),
                   ),
-                  const Text('SMT-CHECK 1.3', style: TextStyle(fontSize: 10)),
+                  const Text('SMT-CHECK 1.4', style: TextStyle(fontSize: 10)),
                 ],
               ),
             ),

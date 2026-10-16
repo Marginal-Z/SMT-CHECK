@@ -2,28 +2,100 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'localized_text.dart';
+import '../core/models.dart';
 
-const good = Color(0xFF16804A), bad = Color(0xFFC53535);
+const good = Color(0xFF0A713B), bad = Color(0xFFB21E2B);
+
+enum ThemeAccent { black, blue, green }
+
+extension ThemeAccentLabel on ThemeAccent {
+  String get label => switch (this) {
+    ThemeAccent.black => '黑色',
+    ThemeAccent.blue => '蓝色',
+    ThemeAccent.green => '绿色',
+  };
+}
+
+class AccentTheme extends ThemeExtension<AccentTheme> {
+  final ThemeAccent accent;
+  const AccentTheme(this.accent);
+  @override
+  AccentTheme copyWith({ThemeAccent? accent}) =>
+      AccentTheme(accent ?? this.accent);
+  @override
+  AccentTheme lerp(covariant AccentTheme? other, double t) =>
+      t < .5 ? this : other ?? this;
+}
+
+class ResultColors {
+  final Color fill, ink, edge, badge, onBadge;
+  const ResultColors(this.fill, this.ink, this.edge, this.badge, this.onBadge);
+}
 
 class Palette {
   final bool dark;
-  const Palette(this.dark);
+  final ThemeAccent themeAccent;
+  const Palette(this.dark, [this.themeAccent = ThemeAccent.black]);
+  Color get accent => switch (themeAccent) {
+    ThemeAccent.black => text,
+    ThemeAccent.blue =>
+      dark ? const Color(0xFF8FBBFF) : const Color(0xFF1559BD),
+    ThemeAccent.green =>
+      dark ? const Color(0xFF83DBAE) : const Color(0xFF087343),
+  };
+  Color get onAccent => dark ? const Color(0xFF141414) : Colors.white;
+  Color get accentSoft =>
+      Color.alphaBlend(accent.withValues(alpha: dark ? .14 : .09), panel);
   Color get bg => dark ? const Color(0xFF141414) : const Color(0xFFF5F5F5);
   Color get panel => dark ? const Color(0xFF1C1C1C) : Colors.white;
   Color get text => dark ? const Color(0xFFF4F4F4) : const Color(0xFF191919);
   Color get muted => dark ? const Color(0xFFAAAAAA) : const Color(0xFF6D6D6D);
   Color get line => dark ? const Color(0xFF363636) : const Color(0xFFE1E1E1);
   Color get hover => dark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0);
-  static Palette of(BuildContext context) =>
-      Palette(Theme.of(context).brightness == Brightness.dark);
+  ResultColors result(CheckStatus status, {bool selected = false}) =>
+      switch (status) {
+        CheckStatus.pass => ResultColors(
+          dark
+              ? (selected ? const Color(0xFF1A603F) : const Color(0xFF12462E))
+              : (selected ? const Color(0xFF94D5AF) : const Color(0xFFBCE8CD)),
+          dark ? const Color(0xFFB3FFD0) : const Color(0xFF07582B),
+          dark ? const Color(0xFF60D493) : good,
+          const Color(0xFF086637),
+          Colors.white,
+        ),
+        CheckStatus.error => ResultColors(
+          dark
+              ? (selected ? const Color(0xFF77313B) : const Color(0xFF5A242B))
+              : (selected ? const Color(0xFFF1A9B2) : const Color(0xFFF8CBCF)),
+      dark ? const Color(0xFFFFCBD0) : const Color(0xFF86121D),
+          dark ? const Color(0xFFFF8493) : bad,
+          const Color(0xFFB21E2B),
+          Colors.white,
+        ),
+        _ => ResultColors(
+          selected ? accentSoft : hover,
+          muted,
+          line,
+          hover,
+          text,
+        ),
+      };
+  static Palette of(BuildContext context) {
+    final theme = Theme.of(context);
+    return Palette(
+      theme.brightness == Brightness.dark,
+      theme.extension<AccentTheme>()?.accent ?? ThemeAccent.black,
+    );
+  }
 }
 
-ThemeData desktopTheme(bool dark) {
-  final p = Palette(dark);
+ThemeData desktopTheme(bool dark, [ThemeAccent accent = ThemeAccent.black]) {
+  final p = Palette(dark, accent);
   return ThemeData(
     useMaterial3: false,
     brightness: dark ? Brightness.dark : Brightness.light,
-    primaryColor: p.text,
+    primaryColor: p.accent,
+    extensions: [AccentTheme(accent)],
     scaffoldBackgroundColor: p.bg,
     canvasColor: p.panel,
     fontFamily: 'Microsoft YaHei',
@@ -38,14 +110,16 @@ ThemeData desktopTheme(bool dark) {
           brightness: dark ? Brightness.dark : Brightness.light,
           primarySwatch: Colors.grey,
         ).copyWith(
-          primary: p.text,
-          secondary: p.text,
+          primary: p.accent,
+          secondary: p.accent,
+          onPrimary: p.onAccent,
+          onSecondary: p.onAccent,
           surface: p.panel,
           error: bad,
         ),
     textSelectionTheme: TextSelectionThemeData(
-      cursorColor: p.text,
-      selectionColor: p.text.withValues(alpha: .16),
+      cursorColor: p.accent,
+      selectionColor: p.accent.withValues(alpha: .20),
     ),
     tooltipTheme: TooltipThemeData(
       waitDuration: const Duration(milliseconds: 450),
@@ -69,7 +143,7 @@ ThemeData desktopTheme(bool dark) {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(4),
-        borderSide: BorderSide(color: p.text),
+        borderSide: BorderSide(color: p.accent),
       ),
     ),
     dividerColor: p.line,
@@ -106,8 +180,8 @@ class _DeskButtonState extends State<DeskButton> {
     final fg = !enabled
         ? p.muted
         : w.primary
-        ? p.panel
-        : w.color ?? p.text;
+        ? p.onAccent
+        : w.color ?? (w.selected ? p.accent : p.text);
     return Semantics(
       button: true,
       enabled: enabled,
@@ -139,13 +213,13 @@ class _DeskButtonState extends State<DeskButton> {
               padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
               decoration: BoxDecoration(
                 color: w.primary && enabled
-                    ? p.text
-                    : (hover || w.selected ? p.hover : p.panel),
+                    ? p.accent
+                    : (hover || w.selected ? p.accentSoft : p.panel),
                 border: Border.all(
                   color: focused
-                      ? p.text
+                      ? p.accent
                       : w.selected
-                      ? p.text
+                      ? p.accent
                       : p.line,
                 ),
                 borderRadius: BorderRadius.circular(4),
@@ -219,14 +293,14 @@ class FilterTab extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border(
             bottom: BorderSide(
-              color: selected ? p.text : Colors.transparent,
+              color: selected ? p.accent : Colors.transparent,
               width: 2,
             ),
           ),
         ),
         child: TextButton(
           style: TextButton.styleFrom(
-            foregroundColor: selected ? p.text : p.muted,
+            foregroundColor: selected ? p.accent : p.muted,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
             shape: const RoundedRectangleBorder(),
           ),
@@ -238,6 +312,54 @@ class FilterTab extends StatelessWidget {
               fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class ResultBadge extends StatelessWidget {
+  final CheckStatus status;
+  final String label;
+  const ResultBadge({super.key, required this.status, required this.label});
+  @override
+  Widget build(BuildContext context) {
+    final colors = Palette.of(context).result(status);
+    final isResult = status == CheckStatus.pass || status == CheckStatus.error;
+    return Tooltip(
+      message: localText(context, label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: isResult ? colors.badge : colors.fill,
+          borderRadius: BorderRadius.circular(3),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isResult) ...[
+              Icon(
+                status == CheckStatus.pass
+                    ? Icons.check_circle_outline
+                    : Icons.error_outline,
+                size: 14,
+                color: colors.onBadge,
+              ),
+              const SizedBox(width: 5),
+            ],
+            Flexible(
+              child: LText(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: isResult ? colors.onBadge : colors.ink,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

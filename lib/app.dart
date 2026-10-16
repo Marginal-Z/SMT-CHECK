@@ -25,6 +25,7 @@ class SmtCheckApp extends StatefulWidget {
   final bool persist;
   final CheckReport? initialReport;
   final String initialLanguage;
+  final ThemeAccent initialAccent;
   final Future<ImportedFile> Function(String, InputKind, String)?
   workbookLoader;
   final AiService Function()? aiServiceFactory;
@@ -41,6 +42,7 @@ class SmtCheckApp extends StatefulWidget {
     this.persist = true,
     this.initialReport,
     this.initialLanguage = 'zh',
+    this.initialAccent = ThemeAccent.black,
     this.workbookLoader,
     this.aiServiceFactory,
     this.sourcePlanner,
@@ -71,6 +73,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   bool aiSourceMode = true;
   String sourceAiText = '', connectionText = '';
   late String language;
+  late ThemeAccent accent;
   String aiText = '', activity = '就绪 · 文件在本机核对', error = '';
   SharedPreferences? prefs;
   AiService? activeAi;
@@ -78,6 +81,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   void initState() {
     super.initState();
     language = widget.initialLanguage;
+    accent = widget.initialAccent;
     report = widget.initialReport;
     if (report != null) {
       bom = report!.files.first;
@@ -94,6 +98,11 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       try {
         prefs = await SharedPreferences.getInstance();
         dark = prefs!.getBool('dark') ?? false;
+        accent =
+            ThemeAccent.values
+                .where((a) => a.name == prefs!.getString('accentColor'))
+                .firstOrNull ??
+            accent;
         final savedLanguage = prefs!.getString('language');
         if (supportedLanguages.contains(savedLanguage)) {
           language = savedLanguage!;
@@ -187,6 +196,15 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       await prefs?.setString('language', value);
     } catch (_) {
       notify('语言已切换，持久保存失败');
+    }
+  }
+
+  Future<void> changeAccent(ThemeAccent value) async {
+    setState(() => accent = value);
+    try {
+      await prefs?.setString('accentColor', value.name);
+    } catch (_) {
+      notify('主题色已切换，持久保存失败');
     }
   }
 
@@ -614,7 +632,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     navigatorKey: navigator,
     title: 'SMT-CHECK',
     debugShowCheckedModeBanner: false,
-    theme: desktopTheme(dark),
+    theme: desktopTheme(dark, accent),
     locale: Locale(language),
     supportedLocales: const [Locale('zh'), Locale('en'), Locale('th')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
@@ -735,7 +753,12 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                     padding: const EdgeInsets.only(top: 7),
                     child: SelectableText(
                       localText(context, error),
-                      style: const TextStyle(color: bad, fontSize: 12),
+                      style: TextStyle(
+                        color: Palette.of(context)
+                            .result(CheckStatus.error)
+                            .ink,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 if (report != null)
@@ -940,6 +963,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     batchLimit: batchLimit,
     busy: aiBusy,
     connection: connectionText,
+    accent: accent,
+    onAccent: (value) => unawaited(changeAccent(value)),
     onLimit: (value) => setState(() => batchLimit = value),
     onSave: () => unawaited(saveAi()),
     onTest: () => unawaited(askAi(test: true)),

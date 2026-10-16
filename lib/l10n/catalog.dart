@@ -1,5 +1,19 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '外观与 AI 接口': ['Appearance and AI connection', 'รูปลักษณ์และการเชื่อมต่อ AI'],
+  '外观': ['Appearance', 'รูปลักษณ์'],
+  '主题色': ['Accent color', 'สีธีม'],
+  '黑色': ['Black', 'สีดำ'],
+  '蓝色': ['Blue', 'สีน้ำเงิน'],
+  '绿色': ['Green', 'สีเขียว'],
+  '主题色即时生效并自动保存；一致为绿色，异常为红色。': [
+    'Accent changes apply immediately and are saved. Matches stay green; mismatches stay red.',
+    'สีธีมเปลี่ยนทันทีและบันทึกอัตโนมัติ รายการตรงกันเป็นสีเขียว ผิดปกติเป็นสีแดง',
+  ],
+  '主题色已切换，持久保存失败': [
+    'Accent changed; saving the preference failed',
+    'เปลี่ยนสีธีมแล้ว แต่บันทึกการตั้งค่าไม่สำเร็จ',
+  ],
   '已取消发送': ['Sending cancelled', 'ยกเลิกการส่งแล้ว'],
   '原始文件 AI 分析失败': [
     'Original file AI analysis failed',

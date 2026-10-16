@@ -43,6 +43,7 @@ Exec=/opt/smt-check/SMT-CHECK
 Icon=smt-check
 Terminal=false
 Categories=Office;Utility;
+StartupWMClass=com.smtcheck.smt_check
 EOF
 chmod 755 "$package_root" "$package_root/DEBIAN" "$package_root/opt/smt-check/SMT-CHECK"
 dpkg-deb --root-owner-group --build "$package_root" "$task_root/dist/SMT-CHECK-linux-amd64.deb"
