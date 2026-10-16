@@ -231,6 +231,13 @@ void main() {
   });
   test('zero quantity placeholder only excludes when positions empty', () {
     expect(check([row('A', '0', '')], []).count(CheckStatus.excluded), 1);
+    // An unreadable formula must not masquerade as an empty placeholder.
+    expect(
+      check([
+        row('A', '0', '', importIssues: ['插件位置 含公式但没有缓存值，请用 Excel 重算并保存']),
+      ], []).errors,
+      hasLength(1),
+    );
     expect(
       check([row('A', '0', 'R1')], [row('A', '1', 'R1')]).errors,
       hasLength(1),

@@ -22,14 +22,16 @@ class Checker {
         items = <CheckItem>[];
     void collect(MaterialRow row, bool isBom) {
       final excluded = rules.exclusion(row);
-      if (excluded != null) {
+      final matchedKeywords = rules.matchedKeywords(row);
+      if (excluded != null &&
+          (matchedKeywords.isNotEmpty || row.importIssues.isEmpty)) {
         items.add(
           CheckItem(
             part: row.part,
             status: CheckStatus.excluded,
             bom: isBom ? [row] : [],
             smt: isBom ? [] : [row],
-            excludedKeywords: rules.matchedKeywords(row),
+            excludedKeywords: matchedKeywords,
             reasons: [
               excluded,
               ...row.importIssues.map(
