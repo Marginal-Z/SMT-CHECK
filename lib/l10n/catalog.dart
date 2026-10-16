@@ -1,5 +1,12 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '关闭': ['Close', 'ปิด'],
+  '查看全部位号': ['Show all positions', 'แสดงตำแหน่งทั้งหมด'],
+  '共 {count} 个位号 · 保留重复项': [
+    '{count} positions · duplicates retained',
+    '{count} ตำแหน่ง · รวมรายการซ้ำ',
+  ],
+  '原始位号文本': ['Original position text', 'ข้อความตำแหน่งต้นฉบับ'],
   '核对完成 · {pass} 项 PASS / {count} 项 NG': [
     'Verification complete · {pass} PASS / {count} NG',
     'ตรวจสอบเสร็จแล้ว · PASS {pass} รายการ / NG {count} รายการ',

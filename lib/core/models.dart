@@ -2,6 +2,16 @@ import 'positions.dart';
 
 enum InputKind { bom, station }
 
+// Keep enum identities stable; presentation order is independent of serialization.
+extension CheckStatusOrder on CheckStatus {
+  int get displayOrder => switch (this) {
+    CheckStatus.pass => 0,
+    CheckStatus.error => 1,
+    CheckStatus.excluded => 2,
+    CheckStatus.candidate => 3,
+  };
+}
+
 class MaterialRow {
   final String part,
       description,

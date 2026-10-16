@@ -1,6 +1,11 @@
 class ParsedPositions {
   final List<String> values, issues;
-  const ParsedPositions(this.values, this.issues);
+  final List<String> invalidTokens;
+  const ParsedPositions(
+    this.values,
+    this.issues, {
+    this.invalidTokens = const [],
+  });
   Set<String> get unique => values.toSet();
 }
 
@@ -21,7 +26,7 @@ ParsedPositions parsePositions(String text, {bool bom = false}) {
       (m) => '${m[1]}${m[2]}',
     );
   }
-  final values = <String>[], issues = <String>[];
+  final values = <String>[], issues = <String>[], invalidTokens = <String>[];
   for (final token
       in raw.split(RegExp(r'[,;\s]+')).where((s) => s.isNotEmpty)) {
     final range = RegExp(r'^(\d*[A-Z]+)(\d+)[~-](?:(\d*[A-Z]+))?(\d+)$')
@@ -31,6 +36,7 @@ ParsedPositions parsePositions(String text, {bool bom = false}) {
       final start = int.parse(range[2]!), end = int.parse(range[4]!);
       if (prefix != endPrefix || end < start || end - start > 10000) {
         issues.add('无法解析位号区间「$token」');
+        invalidTokens.add(token);
         continue;
       }
       for (var i = start; i <= end; i++) {
@@ -41,6 +47,7 @@ ParsedPositions parsePositions(String text, {bool bom = false}) {
       values.add(token);
     } else {
       issues.add('无法识别位号「$token」');
+      invalidTokens.add(token);
     }
   }
   final counts = <String, int>{};
@@ -50,7 +57,7 @@ ParsedPositions parsePositions(String text, {bool bom = false}) {
   for (final e in counts.entries.where((e) => e.value > 1)) {
     issues.add('位号 ${e.key} 在同一行重复 ${e.value} 次');
   }
-  return ParsedPositions(values, issues);
+  return ParsedPositions(values, issues, invalidTokens: invalidTokens);
 }
 
 String normalizePart(String s) => s.trim().toUpperCase();

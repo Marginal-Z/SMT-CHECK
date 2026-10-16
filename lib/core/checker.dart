@@ -173,8 +173,8 @@ class Checker {
       );
     }
     items.sort(
-      (a, b) => a.status.index != b.status.index
-          ? a.status.index.compareTo(b.status.index)
+      (a, b) => a.status != b.status
+          ? a.status.displayOrder.compareTo(b.status.displayOrder)
           : a.part.compareTo(b.part),
     );
     return CheckReport(items, rules, stations.length == 2, [bom, ...stations]);

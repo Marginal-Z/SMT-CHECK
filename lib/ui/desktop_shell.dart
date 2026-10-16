@@ -80,16 +80,9 @@ class DesktopShell extends StatelessWidget {
                               child: Semantics(
                                 selected: page == i,
                                 child: Container(
-                                  height: 56,
-                                  decoration: BoxDecoration(
-                                    border: Border(
-                                      bottom: BorderSide(
-                                        color: page == i
-                                            ? p.accent
-                                            : Colors.transparent,
-                                        width: 2,
-                                      ),
-                                    ),
+                                  height: 36,
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 2,
                                   ),
                                   child: TextButton(
                                     style: TextButton.styleFrom(
@@ -105,7 +98,9 @@ class DesktopShell extends StatelessWidget {
                                       padding: EdgeInsets.symmetric(
                                         horizontal: compact ? 6 : 14,
                                       ),
-                                      shape: const RoundedRectangleBorder(),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
                                     ),
                                     onPressed: () => onPage(i),
                                     child: Row(
@@ -124,8 +119,11 @@ class DesktopShell extends StatelessWidget {
                                           const SizedBox(width: 7),
                                           LText(
                                             desktopPages[i],
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12,
+                                              fontWeight: page == i
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
                                             ),
                                           ),
                                         ],
@@ -164,7 +162,14 @@ class DesktopShell extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  DeskButton(dark ? '浅色' : '深色', onPressed: onTheme),
+                  DeskButton(
+                    dark ? '浅色' : '深色',
+                    onPressed: onTheme,
+                    variant: DeskButtonVariant.quiet,
+                    icon: dark
+                        ? Icons.light_mode_outlined
+                        : Icons.dark_mode_outlined,
+                  ),
                 ],
               ),
             ),
@@ -201,7 +206,7 @@ class DesktopShell extends StatelessWidget {
                       style: TextStyle(fontSize: 11, color: p.muted),
                     ),
                   ),
-                  const Text('SMT-CHECK 1.5.1', style: TextStyle(fontSize: 10)),
+                  const Text('SMT-CHECK 1.6.0', style: TextStyle(fontSize: 10)),
                 ],
               ),
             ),
@@ -236,19 +241,19 @@ class FileStrip extends StatelessWidget {
     Widget slot((String, ImportedFile?, String, int) entry) {
       final (label, file, action, index) = entry;
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         child: Row(
           children: [
-            SizedBox(
-              width: 50,
-              child: Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
+            Container(
+              width: 30,
+              height: 34,
+              decoration: BoxDecoration(
+                color: p.hover,
+                borderRadius: BorderRadius.circular(5),
               ),
+              child: Icon(Icons.description_outlined, size: 17, color: p.muted),
             ),
+            const SizedBox(width: 10),
             Expanded(
               child: Tooltip(
                 message: file?.path ?? localText(context, '尚未选择文件'),
@@ -256,6 +261,25 @@ class FileStrip extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    Row(
+                      children: [
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (file != null) ...[
+                          const SizedBox(width: 8),
+                          LText(
+                            '${file.rows.length}行',
+                            style: TextStyle(fontSize: 10, color: p.muted),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
                     Text(
                       file?.name ?? localText(context, '待导入'),
                       maxLines: 1,
@@ -265,11 +289,6 @@ class FileStrip extends StatelessWidget {
                         color: file == null ? p.muted : p.text,
                       ),
                     ),
-                    if (file != null)
-                      LText(
-                        '${file.rows.length}行',
-                        style: TextStyle(fontSize: 10, color: p.muted),
-                      ),
                   ],
                 ),
               ),
@@ -277,6 +296,7 @@ class FileStrip extends StatelessWidget {
             const SizedBox(width: 8),
             DeskButton(
               action,
+              variant: DeskButtonVariant.quiet,
               icon: Icons.folder_open_outlined,
               onPressed: enabled ? () => onPick(index) : null,
             ),
@@ -289,7 +309,7 @@ class FileStrip extends StatelessWidget {
       decoration: BoxDecoration(
         color: p.panel,
         border: Border.all(color: p.line),
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(7),
       ),
       child: LayoutBuilder(
         builder: (context, c) => c.maxWidth >= 1000
@@ -309,6 +329,40 @@ class FileStrip extends StatelessWidget {
                   ],
                 ],
               ),
+      ),
+    );
+  }
+}
+
+class StationModeSwitch extends StatelessWidget {
+  final bool merged, enabled;
+  final ValueChanged<bool> onChanged;
+  const StationModeSwitch({
+    super.key,
+    required this.merged,
+    required this.enabled,
+    required this.onChanged,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: p.hover,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final (label, value) in [('单站位表', false), ('A + B 合并', true)])
+            DeskButton(
+              label,
+              selected: merged == value,
+              variant: DeskButtonVariant.segment,
+              onPressed: enabled ? () => onChanged(value) : null,
+            ),
+        ],
       ),
     );
   }

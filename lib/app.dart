@@ -800,25 +800,13 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                   runSpacing: 8,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    DeskButton(
-                      '单站位表',
-                      selected: !merged,
-                      onPressed: busy || aiBusy
-                          ? null
-                          : () => setState(() {
-                              merged = false;
-                              invalidate();
-                            }),
-                    ),
-                    DeskButton(
-                      'A + B 合并',
-                      selected: merged,
-                      onPressed: busy || aiBusy
-                          ? null
-                          : () => setState(() {
-                              merged = true;
-                              invalidate();
-                            }),
+                    StationModeSwitch(
+                      merged: merged,
+                      enabled: !busy && !aiBusy,
+                      onChanged: (value) => setState(() {
+                        merged = value;
+                        invalidate();
+                      }),
                     ),
                     DeskButton(
                       busy ? '处理中…' : '开始核对',
@@ -830,11 +818,13 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                     ),
                     DeskButton(
                       '原始文件 AI 核对',
+                      variant: DeskButtonVariant.quiet,
                       icon: Icons.auto_awesome_outlined,
                       onPressed: busy || aiBusy ? null : analyzeSources,
                     ),
                     DeskButton(
                       '清空重来',
+                      variant: DeskButtonVariant.quiet,
                       key: const Key('clear-session'),
                       icon: Icons.restart_alt,
                       onPressed: clearSession,

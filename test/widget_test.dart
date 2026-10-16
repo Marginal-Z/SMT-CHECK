@@ -170,8 +170,10 @@ void main() {
         }
         expect(find.text(translate('BOM插件位置', language)), findsOneWidget);
         expect(find.text(translate('SMT站位表位号', language)), findsOneWidget);
-        expect(find.text('R1,R2'), findsOneWidget);
-        expect(find.text('R2 R1'), findsOneWidget);
+        expect(find.byTooltip('R1,R2'), findsWidgets);
+        expect(find.byTooltip('R2 R1'), findsWidgets);
+        expect(find.text('R1'), findsNWidgets(2));
+        expect(find.text('R2'), findsNWidgets(2));
         await tester.tap(find.text('${translate('已排除物料', language)} (1)'));
         await tester.pumpAndSettle();
         expect(find.text('PASTE'), findsOneWidget);

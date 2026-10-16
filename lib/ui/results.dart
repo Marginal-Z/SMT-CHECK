@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../core/models.dart';
 import '../core/positions.dart';
 import 'design.dart';
+import 'position_chips.dart';
 
 class ResultsView extends StatefulWidget {
   final CheckReport report;
@@ -65,8 +66,8 @@ class _ResultsViewState extends State<ResultsView> {
               children: [
                 for (final (label, status) in [
                   ('全部', null),
-                  ('NG', CheckStatus.error),
                   ('PASS', CheckStatus.pass),
+                  ('NG', CheckStatus.error),
                   ('已排除物料', CheckStatus.excluded),
                   ('候选料', CheckStatus.candidate),
                 ])
@@ -99,12 +100,19 @@ class _ResultsViewState extends State<ResultsView> {
                 ),
                 DeskButton(
                   '导出 CSV',
+                  variant: DeskButtonVariant.quiet,
                   icon: Icons.download_outlined,
                   onPressed: () => widget.onExport(false),
                 ),
-                DeskButton('JSON', onPressed: () => widget.onExport(true)),
+                DeskButton(
+                  'JSON',
+                  variant: DeskButtonVariant.quiet,
+                  onPressed: () => widget.onExport(true),
+                ),
+                Container(width: 1, height: 20, color: p.line),
                 DeskButton(
                   detailsOpen ? '收起详情' : '展开详情',
+                  variant: DeskButtonVariant.quiet,
                   icon: Icons.vertical_split_outlined,
                   onPressed: widget.selected == null
                       ? null
@@ -275,6 +283,7 @@ class _ResultsViewState extends State<ResultsView> {
                                                           ],
                                                           color: colors.ink,
                                                           status: item.status,
+                                                          item: item,
                                                           selected: isSelected,
                                                           width: tableWidth,
                                                         ),
@@ -376,6 +385,7 @@ class _ResultsViewState extends State<ResultsView> {
     bool header = false,
     Color? color,
     CheckStatus? status,
+    CheckItem? item,
     bool selected = false,
     required double width,
   }) {
@@ -413,6 +423,12 @@ class _ResultsViewState extends State<ResultsView> {
                     : values[i],
                 child: i == 0 && status != null
                     ? ResultBadge(status: status, label: values[i])
+                    : item != null && (i == 5 || i == 6)
+                    ? PositionChips(
+                        rows: i == 5 ? item.bom : item.smt,
+                        bom: i == 5,
+                        status: item.status,
+                      )
                     : Text(
                         header || i == 0
                             ? localText(context, values[i])

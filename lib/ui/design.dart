@@ -142,12 +142,15 @@ ThemeData desktopTheme(bool dark, [ThemeAccent accent = ThemeAccent.black]) {
   );
 }
 
+enum DeskButtonVariant { outlined, quiet, segment }
+
 class DeskButton extends StatefulWidget {
   final String label;
   final IconData? icon;
   final VoidCallback? onPressed;
   final bool primary, selected;
   final Color? color;
+  final DeskButtonVariant variant;
   const DeskButton(
     this.label, {
     super.key,
@@ -156,6 +159,7 @@ class DeskButton extends StatefulWidget {
     this.primary = false,
     this.selected = false,
     this.color,
+    this.variant = DeskButtonVariant.outlined,
   });
   @override
   State<DeskButton> createState() => _DeskButtonState();
@@ -167,6 +171,8 @@ class _DeskButtonState extends State<DeskButton> {
   Widget build(BuildContext context) {
     final p = Palette.of(context), w = widget;
     final enabled = w.onPressed != null;
+    final segment = w.variant == DeskButtonVariant.segment;
+    final outlined = w.variant == DeskButtonVariant.outlined;
     final label = localText(context, w.label);
     final fg = !enabled
         ? p.muted
@@ -176,6 +182,7 @@ class _DeskButtonState extends State<DeskButton> {
     return Semantics(
       button: true,
       enabled: enabled,
+      selected: w.selected,
       label: label,
       child: FocusableActionDetector(
         enabled: enabled,
@@ -201,19 +208,27 @@ class _DeskButtonState extends State<DeskButton> {
           child: GestureDetector(
             onTap: w.onPressed,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
               decoration: BoxDecoration(
                 color: w.primary && enabled
                     ? p.accent
-                    : (hover || w.selected ? p.accentSoft : p.panel),
+                    : segment && w.selected
+                    ? p.panel
+                    : (hover && enabled || w.selected)
+                    ? p.accentSoft
+                    : outlined
+                    ? p.panel
+                    : Colors.transparent,
                 border: Border.all(
                   color: focused
                       ? p.accent
-                      : w.selected
+                      : w.selected && outlined
                       ? p.accent
-                      : p.line,
+                      : outlined || segment && w.selected
+                      ? p.line
+                      : Colors.transparent,
                 ),
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -229,7 +244,7 @@ class _DeskButtonState extends State<DeskButton> {
                       color: fg,
                       fontWeight: w.primary || w.selected
                           ? FontWeight.w600
-                          : FontWeight.w400,
+                          : FontWeight.w500,
                     ),
                   ),
                 ],
