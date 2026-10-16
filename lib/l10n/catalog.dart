@@ -1,5 +1,52 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '字段差异对照': ['Field differences', 'ความแตกต่างของแต่ละฟิลด์'],
+  'BOM 汇总数量': ['BOM total quantity', 'จำนวนรวม BOM'],
+  'SMT 汇总数量': ['SMT total quantity', 'จำนวนรวม SMT'],
+  'BOM 位号集合': ['BOM reference set', 'ชุดตำแหน่ง BOM'],
+  'SMT 位号集合': ['SMT reference set', 'ชุดตำแหน่ง SMT'],
+  '字段差异': ['Field differences', 'ความแตกต่างของฟิลด์'],
+  '查看具体差异': ['View exact differences', 'ดูจุดที่แตกต่าง'],
+  'BOM 原值': ['BOM value', 'ค่าต้นฉบับ BOM'],
+  'SMT 原值': ['SMT value', 'ค่าต้นฉบับ SMT'],
+  '无对应记录': ['No matching record', 'ไม่มีรายการที่ตรงกัน'],
+  '空值': ['Empty value', 'ค่าว่าง'],
+  '红色标出描述差异片段；仅忽略大小写和空白。': [
+    'Changed description segments are red; only case and whitespace are ignored.',
+    'ส่วนของรายละเอียดที่แตกต่างแสดงสีแดง โดยละเว้นเฉพาะตัวพิมพ์และช่องว่าง',
+  ],
+  '同一料号存在多种描述，请逐行核对下方原始记录。': [
+    'This part has multiple descriptions. Review each original row below.',
+    'รหัสวัสดุเดียวกันมีหลายรายละเอียด โปรดตรวจแต่ละแถวต้นฉบับด้านล่าง',
+  ],
+  '品名/物料描述不一致：BOM「{bom}」；SMT「{smt}」': [
+    'Name/description mismatch: BOM “{bom}”; SMT “{smt}”',
+    'ชื่อหรือรายละเอียดไม่ตรงกัน: BOM “{bom}”; SMT “{smt}”',
+  ],
+  '{side} 同一料号存在 {count} 种不同描述，请核对各原始行': [
+    '{side} has {count} descriptions for this part; review each source row',
+    '{side} มี {count} รายละเอียดสำหรับรหัสวัสดุเดียวกัน โปรดตรวจแต่ละแถวต้นฉบับ',
+  ],
+  'SMT 比 BOM 多 {quantity}': [
+    'SMT has {quantity} more than BOM',
+    'SMT มีมากกว่า BOM {quantity}',
+  ],
+  'SMT 比 BOM 少 {quantity}': [
+    'SMT has {quantity} fewer than BOM',
+    'SMT มีน้อยกว่า BOM {quantity}',
+  ],
+  '位号 {position} 对应料号': [
+    'Part number at {position}',
+    'รหัสวัสดุที่ตำแหน่ง {position}',
+  ],
+  '位号 {position} 对应料号不一致：BOM「{bom}」；SMT「{smt}」': [
+    'Part number mismatch at {position}: BOM “{bom}”; SMT “{smt}”',
+    'รหัสวัสดุที่ตำแหน่ง {position} ไม่ตรงกัน: BOM “{bom}”; SMT “{smt}”',
+  ],
+  '{side} / {file} / {sheet} / 第 {row} 行：{message}': [
+    '{side} / {file} / {sheet} / row {row}: {message}',
+    '{side} / {file} / {sheet} / แถว {row}: {message}',
+  ],
   '检查更新': ['Check for updates', 'ตรวจสอบอัปเดต'],
   '正在检查更新…': ['Checking for updates…', 'กำลังตรวจสอบอัปเดต…'],
   '当前版本：{version}': [

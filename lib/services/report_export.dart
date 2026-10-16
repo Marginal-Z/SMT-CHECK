@@ -14,6 +14,16 @@ class ReportExport {
       item['reasons'] = (item['reasons'] as List)
           .map((r) => translate(r as String, language))
           .toList();
+      for (final difference in item['fieldDifferences'] as List) {
+        difference['title'] = translate(
+          difference['title'] as String,
+          language,
+        );
+        difference['reasons'] = (difference['reasons'] as List)
+            .map((r) => translate(r as String, language))
+            .toList();
+        difference['reason'] = (difference['reasons'] as List).join('\n');
+      }
     }
     for (final file in data['files'] as List) {
       file['notes'] = (file['notes'] as List)
@@ -73,6 +83,7 @@ class ReportExport {
         '异常/原因',
         'BOM来源',
         'SMT来源',
+        '字段差异',
       ].map(t).toList(),
       for (final item in report.items)
         [
@@ -88,6 +99,12 @@ class ReportExport {
           item.reasons.map(t).join('\n'),
           item.bom.map(location).join('\n'),
           item.smt.map(location).join('\n'),
+          item.fieldDifferences
+              .map(
+                (d) =>
+                    '${t(d.title)}\nBOM: ${d.bomMissing ? t('无对应记录') : d.bomValue}\nSMT: ${d.smtMissing ? t('无对应记录') : d.smtValue}\n${d.reasons.map(t).join('\n')}',
+              )
+              .join('\n\n'),
         ],
       [t('导入审计')],
       for (final f in report.files) ...[

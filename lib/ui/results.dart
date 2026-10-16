@@ -8,6 +8,7 @@ import '../core/models.dart';
 import '../core/positions.dart';
 import 'design.dart';
 import 'position_chips.dart';
+import 'field_difference.dart';
 
 class ResultsView extends StatefulWidget {
   final CheckReport report;
@@ -37,6 +38,28 @@ class _ResultsViewState extends State<ResultsView> {
     horizontal.dispose();
     vertical.dispose();
     super.dispose();
+  }
+
+  void openItem(BuildContext context, CheckItem item, bool showDetail) {
+    widget.onSelect(item);
+    setState(() => detailsOpen = true);
+    if (!showDetail) {
+      showDialog<void>(
+        context: context,
+        builder: (context) => Dialog(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 690, maxHeight: 760),
+            child: ItemDetail(
+              key: ValueKey(item),
+              item: item,
+              onAi: widget.onAi,
+            ),
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -203,40 +226,11 @@ class _ResultsViewState extends State<ResultsView> {
                                                     label:
                                                         '${item.part} ${localText(context, item.label)}',
                                                     child: InkWell(
-                                                      onTap: () {
-                                                        widget.onSelect(item);
-                                                        setState(
-                                                          () => detailsOpen =
-                                                              true,
-                                                        );
-                                                        if (!showDetail) {
-                                                          showDialog<void>(
-                                                            context: context,
-                                                            builder: (context) => Dialog(
-                                                              shape: RoundedRectangleBorder(
-                                                                borderRadius:
-                                                                    BorderRadius.circular(
-                                                                      4,
-                                                                    ),
-                                                              ),
-                                                              child: ConstrainedBox(
-                                                                constraints:
-                                                                    const BoxConstraints(
-                                                                      maxWidth:
-                                                                          690,
-                                                                      maxHeight:
-                                                                          760,
-                                                                    ),
-                                                                child: ItemDetail(
-                                                                  item: item,
-                                                                  onAi: widget
-                                                                      .onAi,
-                                                                ),
-                                                              ),
-                                                            ),
-                                                          );
-                                                        }
-                                                      },
+                                                      onTap: () => openItem(
+                                                        context,
+                                                        item,
+                                                        showDetail,
+                                                      ),
                                                       child: Container(
                                                         key: ObjectKey(item),
                                                         decoration: BoxDecoration(
@@ -284,6 +278,12 @@ class _ResultsViewState extends State<ResultsView> {
                                                           color: colors.ink,
                                                           status: item.status,
                                                           item: item,
+                                                          onDetails: () =>
+                                                              openItem(
+                                                                context,
+                                                                item,
+                                                                showDetail,
+                                                              ),
                                                           selected: isSelected,
                                                           width: tableWidth,
                                                         ),
@@ -340,6 +340,7 @@ class _ResultsViewState extends State<ResultsView> {
                             const Divider(height: 1),
                             Expanded(
                               child: ItemDetail(
+                                key: ValueKey(widget.selected),
                                 item: widget.selected!,
                                 onAi: widget.onAi,
                               ),
@@ -386,6 +387,7 @@ class _ResultsViewState extends State<ResultsView> {
     Color? color,
     CheckStatus? status,
     CheckItem? item,
+    VoidCallback? onDetails,
     bool selected = false,
     required double width,
   }) {
@@ -428,6 +430,34 @@ class _ResultsViewState extends State<ResultsView> {
                         rows: i == 5 ? item.bom : item.smt,
                         bom: i == 5,
                         status: item.status,
+                      )
+                    : item != null && item.status == CheckStatus.error && i == 7
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              values[i],
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                height: 1.55,
+                                fontWeight: FontWeight.w600,
+                                color: Palette.of(context).text,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: localText(context, '查看具体差异'),
+                            constraints: const BoxConstraints(
+                              minWidth: 28,
+                              minHeight: 28,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            icon: const Icon(Icons.manage_search, size: 19),
+                            onPressed: onDetails,
+                          ),
+                        ],
                       )
                     : Text(
                         header || i == 0
@@ -480,6 +510,15 @@ class ItemDetail extends StatelessWidget {
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 18),
+          if (item.fieldDifferences.isNotEmpty) ...[
+            const LText(
+              '字段差异对照',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            for (final difference in item.fieldDifferences)
+              FieldDifferenceCard(difference: difference),
+          ],
           if (item.excludedKeywords.isNotEmpty) ...[
             const LText(
               '命中排除关键词',

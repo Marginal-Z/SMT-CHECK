@@ -1,4 +1,5 @@
 import 'positions.dart';
+import 'text_difference.dart';
 
 enum InputKind { bom, station }
 
@@ -144,10 +145,55 @@ class CheckRules {
 
 enum CheckStatus { error, pass, excluded, candidate }
 
+enum DifferenceField { part, description, quantity, positions }
+
+class FieldDifference {
+  // Quantity values are totals and position values are parsed sets. Part and
+  // description values retain source spelling; CheckItem retains every raw row.
+  final DifferenceField field;
+  final String title, bomValue, smtValue;
+  final List<String> reasons;
+  String get reason => reasons.join('\n');
+  final List<String> bomSources, smtSources;
+  final bool highlightText;
+  final bool bomMissing, smtMissing;
+  final List<TextChangeRange> bomHighlights, smtHighlights;
+  const FieldDifference({
+    required this.field,
+    required this.title,
+    required this.bomValue,
+    required this.smtValue,
+    required this.reasons,
+    this.bomSources = const [],
+    this.smtSources = const [],
+    this.highlightText = false,
+    this.bomHighlights = const [],
+    this.smtHighlights = const [],
+    this.bomMissing = false,
+    this.smtMissing = false,
+  });
+  Map<String, dynamic> toJson() => {
+    'field': field.name,
+    'title': title,
+    'bomValue': bomValue,
+    'smtValue': smtValue,
+    'reason': reason,
+    'reasons': reasons,
+    'bomSources': bomSources,
+    'smtSources': smtSources,
+    'highlightText': highlightText,
+    'bomMissing': bomMissing,
+    'smtMissing': smtMissing,
+    'bomHighlights': bomHighlights.map((r) => r.toJson(bomValue)).toList(),
+    'smtHighlights': smtHighlights.map((r) => r.toJson(smtValue)).toList(),
+  };
+}
+
 class CheckItem {
   final String part;
   final CheckStatus status;
   final List<MaterialRow> bom, smt;
+  final List<FieldDifference> fieldDifferences;
   final List<String> reasons,
       missingPositions,
       extraPositions,
@@ -158,6 +204,7 @@ class CheckItem {
     required this.bom,
     required this.smt,
     required this.reasons,
+    this.fieldDifferences = const [],
     this.missingPositions = const [],
     this.extraPositions = const [],
     this.excludedKeywords = const [],
@@ -188,6 +235,7 @@ class CheckItem {
     'smtPositions': smtPositions,
     'excludedKeywords': excludedKeywords,
     'reasons': reasons,
+    'fieldDifferences': fieldDifferences.map((d) => d.toJson()).toList(),
     'missingPositions': missingPositions,
     'extraPositions': extraPositions,
     'bom': bom.map((r) => r.toJson()).toList(),

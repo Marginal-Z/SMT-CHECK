@@ -1,5 +1,6 @@
 import 'models.dart';
 import 'positions.dart';
+import 'text_difference.dart';
 
 class Checker {
   CheckReport run(
@@ -81,6 +82,45 @@ class Checker {
         sOwners = owners(s.values.expand((r) => r), false);
     for (final part in {...b.keys, ...s.keys}) {
       final br = b[part] ?? [], sr = s[part] ?? [], reasons = <String>[];
+      final differences = <FieldDifference>[];
+      String rawParts(List<MaterialRow> rows) =>
+          rows.map((r) => r.part).toSet().join('、');
+      String source(MaterialRow r) =>
+          '${r.side == 'A' || r.side == 'B' ? '${r.side} · ' : ''}${r.file} / ${r.sheet}:${r.row}${r.station.isEmpty ? '' : ' / ${r.station}'}';
+      List<String> sources(List<MaterialRow> rows) =>
+          rows.map(source).toSet().toList();
+      void difference(
+        DifferenceField field,
+        String title,
+        String bv,
+        String sv,
+        String reason, {
+        List<MaterialRow>? bomRows,
+        List<MaterialRow>? smtRows,
+        bool highlight = false,
+        List<TextChangeRange> bh = const [],
+        List<TextChangeRange> sh = const [],
+        List<String>? notes,
+      }) {
+        final bm = bomRows ?? br, sm = smtRows ?? sr;
+        differences.add(
+          FieldDifference(
+            field: field,
+            title: title,
+            bomValue: bv,
+            smtValue: sv,
+            reasons: notes ?? [reason],
+            bomSources: sources(bm),
+            smtSources: sources(sm),
+            bomMissing: bm.isEmpty,
+            smtMissing: sm.isEmpty,
+            highlightText: highlight,
+            bomHighlights: bh,
+            smtHighlights: sh,
+          ),
+        );
+      }
+
       if (part.isEmpty) {
         reasons.add('料号为空，无法关联核对');
       }
@@ -94,9 +134,24 @@ class Checker {
               : 'BOM 有料，A+B 合并站位表缺少此料号',
         );
       }
+      if (part.isEmpty || br.isEmpty || sr.isEmpty) {
+        difference(
+          DifferenceField.part,
+          '料号',
+          rawParts(br),
+          rawParts(sr),
+          reasons.join('\n'),
+          notes: [...reasons],
+        );
+      }
       for (final group in [br, sr]) {
         for (final row in group) {
-          final label = '${row.file} 第 ${row.row} 行';
+          final label =
+              '${group == br
+                  ? 'BOM'
+                  : row.side == 'A' || row.side == 'B'
+                  ? 'SMT ${row.side}'
+                  : 'SMT'} / ${row.file} / ${row.sheet} / 第 ${row.row} 行';
           reasons.addAll(row.importIssues.map((i) => '$label：$i'));
           final qty = row.quantity;
           if (qty == null || !qty.isFinite || qty <= 0) {
@@ -121,7 +176,7 @@ class Checker {
             final own = (group == br ? bOwners : sOwners)[p]!;
             if (own.length > 1) {
               reasons.add(
-                '${group == br ? 'BOM' : 'SMT'} 位号 $p 跨行重复/冲突：${own.map((o) => '${o.part}（${o.side} ${o.sheet}:${o.row}）').join('、')}',
+                '${group == br ? 'BOM' : 'SMT'} 位号 $p 跨行重复/冲突：${own.map((o) => '${o.part}（${source(o)}）').join('、')}',
               );
             }
           }
@@ -136,13 +191,49 @@ class Checker {
         reasons.add(
           '数量不符：BOM ${numberText(bq)}，SMT ${numberText(sq)}，差额 ${numberText(sq - bq)}（SMT − BOM）',
         );
+        difference(
+          DifferenceField.quantity,
+          '数量',
+          numberText(bq),
+          numberText(sq),
+          sq > bq
+              ? 'SMT 比 BOM 多 ${numberText(sq - bq)}'
+              : 'SMT 比 BOM 少 ${numberText(bq - sq)}',
+        );
       }
       final bd = br.map((r) => normalizeDescription(r.description)).toSet();
       final sd = sr.map((r) => normalizeDescription(r.description)).toSet();
       if (br.isNotEmpty &&
           sr.isNotEmpty &&
           (bd.length != 1 || sd.length != 1 || bd.single != sd.single)) {
-        reasons.add('品名/物料描述不一致（仅忽略大小写和空白，未自动认定规格或品牌等效）');
+        String descriptions(List<MaterialRow> rows) {
+          final unique = <String, String>{};
+          for (final row in rows) {
+            unique.putIfAbsent(
+              normalizeDescription(row.description),
+              () => row.description,
+            );
+          }
+          return unique.values.join('\n');
+        }
+
+        final bv = descriptions(br), sv = descriptions(sr);
+        final reason = '品名/物料描述不一致：BOM「$bv」；SMT「$sv」';
+        reasons.add(reason);
+        if (bd.length > 1) reasons.add('BOM 同一料号存在 ${bd.length} 种不同描述，请核对各原始行');
+        if (sd.length > 1) reasons.add('SMT 同一料号存在 ${sd.length} 种不同描述，请核对各原始行');
+        final paired = bd.length == 1 && sd.length == 1;
+        final spans = paired ? compareDescriptionText(bv, sv) : null;
+        difference(
+          DifferenceField.description,
+          '品名 / 物料描述',
+          bv,
+          sv,
+          reason,
+          highlight: paired,
+          bh: spans?.bom ?? [],
+          sh: spans?.smt ?? [],
+        );
       }
       final bp = br
           .expand((r) => parsePositions(r.positionsText, bom: true).values)
@@ -158,6 +249,50 @@ class Checker {
       if (extra.isNotEmpty) {
         reasons.add('SMT 多出位号：${extra.join('、')}');
       }
+      if (missing.isNotEmpty || extra.isNotEmpty) {
+        final bv = bp.toList()..sort(), sv = sp.toList()..sort();
+        final notes = [
+          if (missing.isNotEmpty) 'SMT 缺少位号：${missing.join('、')}',
+          if (extra.isNotEmpty) 'SMT 多出位号：${extra.join('、')}',
+        ];
+        difference(
+          DifferenceField.positions,
+          '位号',
+          bv.join('、'),
+          sv.join('、'),
+          notes.join('\n'),
+          notes: notes,
+          highlight: true,
+          bh: positionChangeRanges(bv, missing.toSet()),
+          sh: positionChangeRanges(sv, extra.toSet()),
+        );
+      }
+      for (final position in ({...bp, ...sp}.toList()..sort())) {
+        final bo = bOwners[position] ?? [], so = sOwners[position] ?? [];
+        if (bo.isEmpty || so.isEmpty) continue;
+        final boParts = bo.map((r) => normalizePart(r.part)).toSet();
+        final soParts = so.map((r) => normalizePart(r.part)).toSet();
+        if (boParts.length == soParts.length && boParts.containsAll(soParts)) {
+          continue;
+        }
+        final bv = rawParts(bo), sv = rawParts(so);
+        final reason = '位号 $position 对应料号不一致：BOM「$bv」；SMT「$sv」';
+        reasons.add(reason);
+        difference(
+          DifferenceField.part,
+          '位号 $position 对应料号',
+          bv,
+          sv,
+          reason,
+          bomRows: bo,
+          smtRows: so,
+        );
+      }
+      differences.sort(
+        (a, b) => a.field != b.field
+            ? a.field.index.compareTo(b.field.index)
+            : a.title.compareTo(b.title),
+      );
       items.add(
         CheckItem(
           part: part,
@@ -167,6 +302,7 @@ class Checker {
           reasons: reasons.isEmpty
               ? ['料号、描述、汇总数量与位号集合全部一致']
               : reasons.toSet().toList(),
+          fieldDifferences: differences,
           missingPositions: missing,
           extraPositions: extra,
         ),
