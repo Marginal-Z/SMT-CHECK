@@ -1,5 +1,57 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '原始文件较大时建议每批 12000 或 24000 字符；超时后会自动拆小重试。': [
+    'For larger files, use 12000 or 24000 characters per batch. Timed-out batches are automatically split and retried.',
+    'สำหรับไฟล์ขนาดใหญ่ แนะนำ 12000 หรือ 24000 อักขระต่อชุด หากหมดเวลาระบบจะแบ่งชุดให้เล็กลงแล้วลองใหม่',
+  ],
+  '当前选中料号': ['Selected part', 'รหัสวัสดุที่เลือก'],
+  '已被筛选隐藏': ['Hidden by the current filter', 'ถูกซ่อนโดยตัวกรองปัจจุบัน'],
+  '重试未完成批次': ['Retry unfinished batches', 'ลองชุดที่ยังไม่เสร็จอีกครั้ง'],
+  '仅重试未完成批次，保留已完成结果。': [
+    'Only unfinished batches will be retried. Completed results are preserved.',
+    'ลองใหม่เฉพาะชุดที่ยังไม่เสร็จ โดยเก็บผลที่เสร็จแล้วไว้',
+  ],
+  '继续未完成批次': ['Resuming unfinished batches', 'ดำเนินการชุดที่ยังไม่เสร็จต่อ'],
+  '正在等待 AI 返回当前批次，可取消；每批最多等待 5 分钟。': [
+    'Waiting for the current AI batch. You can cancel; each request allows up to 5 minutes.',
+    'กำลังรอผล AI ของชุดปัจจุบัน ยกเลิกได้ โดยรอแต่ละคำขอสูงสุด 5 นาที',
+  ],
+  '本批响应超时或超出接口限制，已自动拆小重试': [
+    'Batch timed out or exceeded the service limit; retrying in smaller batches',
+    'ชุดนี้หมดเวลาหรือเกินขีดจำกัดบริการ จึงแบ่งเป็นชุดเล็กเพื่อลองใหม่',
+  ],
+  'AI 请求超过 {count} 秒，请重试未完成批次或在设置中减小单批字符上限。': [
+    'AI request exceeded {count} seconds. Retry unfinished batches or lower the batch character limit in Settings.',
+    'คำขอ AI เกิน {count} วินาที ลองชุดที่ยังไม่เสร็จอีกครั้งหรือลดจำนวนอักขระต่อชุดในการตั้งค่า',
+  ],
+  'AI 网络连接失败，请检查网络、代理和接口地址后重试未完成批次。': [
+    'AI connection failed. Check the network, proxy and API URL, then retry unfinished batches.',
+    'เชื่อมต่อ AI ไม่สำเร็จ ตรวจเครือข่าย พร็อกซี และ URL ของ API แล้วลองชุดที่ยังไม่เสร็จอีกครั้ง',
+  ],
+  'AI 输出被截断，本批核对尚未完成。请减小单批字符上限后重试。': [
+    'AI output was truncated. This batch is incomplete; lower the batch character limit and retry.',
+    'ผลลัพธ์ AI ถูกตัด ชุดนี้ยังไม่เสร็จ โปรดลดจำนวนอักขระต่อชุดแล้วลองใหม่',
+  ],
+  'AI 服务过滤了本批内容，未完成核对。': [
+    'The AI service filtered this batch. Verification is incomplete.',
+    'บริการ AI กรองเนื้อหาชุดนี้ การตรวจสอบยังไม่เสร็จ',
+  ],
+  'AI 未返回最终核对文本，请检查模型是否只返回推理内容或接口是否兼容 Chat Completions。': [
+    'AI returned no final verification text. Check whether the model returned reasoning only and whether the API supports Chat Completions.',
+    'AI ไม่ได้ส่งข้อความผลตรวจสอบ ตรวจว่าโมเดลส่งเฉพาะการให้เหตุผลหรือไม่ และ API รองรับ Chat Completions หรือไม่',
+  ],
+  'AI 流式返回格式无效。': [
+    'Invalid AI streaming response format.',
+    'รูปแบบข้อมูลสตรีมจาก AI ไม่ถูกต้อง',
+  ],
+  'AI 流式接口返回错误：{detail}': [
+    'AI streaming service error: {detail}',
+    'ข้อผิดพลาดจากบริการสตรีม AI: {detail}',
+  ],
+  'AI 流式连接提前中断，本批核对尚未完成，请重试未完成批次。': [
+    'The AI stream ended early. This batch is incomplete; retry unfinished batches.',
+    'การเชื่อมต่อสตรีม AI สิ้นสุดก่อนเวลา ชุดนี้ยังไม่เสร็จ โปรดลองชุดที่ยังไม่เสร็จอีกครั้ง',
+  ],
   '外观与 AI 接口': ['Appearance and AI connection', 'รูปลักษณ์และการเชื่อมต่อ AI'],
   '外观': ['Appearance', 'รูปลักษณ์'],
   '主题色': ['Accent color', 'สีธีม'],

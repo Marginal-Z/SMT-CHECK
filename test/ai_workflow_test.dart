@@ -128,7 +128,7 @@ void main() {
       await tester.pumpAndSettle();
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getString('aiModel'), 'demo');
-      expect(prefs.getInt('aiBatchLimit'), 48000);
+      expect(prefs.getInt('aiBatchLimit'), 24000);
       expect(
         prefs.getKeys().any((k) => k.toLowerCase().contains('key')),
         isFalse,
@@ -191,4 +191,92 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('a DeepSeek-style response after 90 seconds is still accepted', (
+    tester,
+  ) async {
+    final pending = Completer<http.Response>();
+    await prepare(tester, (_) => pending.future);
+    await startSource(tester);
+    await tester.pump(const Duration(seconds: 95));
+    expect(find.textContaining('原始文件分析中断'), findsNothing);
+    expect(find.text('取消分析'), findsOneWidget);
+    pending.complete(reply('SLOW FINAL ANSWER'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('SLOW FINAL ANSWER'), findsOneWidget);
+    expect(find.textContaining('全部 1 批分析完成'), findsOneWidget);
+  });
+  testWidgets(
+    'retry sends only unfinished batches and retains completed evidence',
+    (tester) async {
+      var calls = 0;
+      await prepare(tester, (request) async {
+        calls++;
+        if (calls == 1) return reply('KEPT EVIDENCE');
+        if (calls == 2) return http.Response('unavailable', 503);
+        expect(
+          jsonDecode(
+            jsonDecode(request.body)['messages'][1]['content'],
+          )['sourceData'].containsKey('rows'),
+          true,
+        );
+        return reply('RECOVERED BATCH');
+      }, plan: twoBatches);
+      await startSource(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('重试未完成批次'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('发送并分析'));
+      await tester.pumpAndSettle();
+      expect(calls, 3);
+      expect(find.textContaining('KEPT EVIDENCE'), findsOneWidget);
+      expect(find.textContaining('RECOVERED BATCH'), findsOneWidget);
+      expect(find.textContaining('全部 2 批分析完成'), findsOneWidget);
+      expect(find.text('重试未完成批次'), findsNothing);
+    },
+  );
+  testWidgets('context rejection automatically splits whole part groups', (
+    tester,
+  ) async {
+    final sent = <List>[];
+    await prepare(
+      tester,
+      (request) async {
+        final parts =
+            jsonDecode(
+                  jsonDecode(request.body)['messages'][1]['content'],
+                )['sourceData']['parts']
+                as List;
+        sent.add(parts);
+        if (parts.length > 1) {
+          return http.Response(
+            jsonEncode({
+              'error': {'code': 'context_length_exceeded'},
+            }),
+            400,
+          );
+        }
+        return reply('CHECKED ${parts.single['part']}');
+      },
+      plan: const SourceAnalysisPlan(
+        [
+          SourceAnalysisBatch(
+            'parts',
+            '{"parts":[{"part":"A","records":[1,2,3]},{"part":"B","records":[4,5]}]}',
+            2,
+          ),
+        ],
+        2,
+        5,
+        5,
+      ),
+    );
+    await startSource(tester);
+    await tester.pumpAndSettle();
+    expect(sent.map((parts) => parts.length), [2, 1, 1]);
+    expect(sent[1].single['records'], [1, 2, 3]);
+    expect(sent[2].single['records'], [4, 5]);
+    expect(find.textContaining('CHECKED A'), findsOneWidget);
+    expect(find.textContaining('CHECKED B'), findsOneWidget);
+    expect(find.textContaining('全部 2 批分析完成'), findsOneWidget);
+  });
 }

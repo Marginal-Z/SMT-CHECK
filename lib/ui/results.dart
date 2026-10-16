@@ -100,6 +100,36 @@ class _ResultsViewState extends State<ResultsView> {
             ),
           ],
         ),
+        if (widget.selected != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            key: const Key('current-selection'),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+            decoration: BoxDecoration(
+              color: p.accentSoft,
+              border: Border.all(color: p.accent),
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.arrow_right_alt, color: p.accent, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${localText(context, '当前选中料号')}：${widget.selected!.part}${list.contains(widget.selected) ? '' : ' · ${localText(context, '已被筛选隐藏')}'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: p.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 10),
         Expanded(
           child: LayoutBuilder(
@@ -112,7 +142,7 @@ class _ResultsViewState extends State<ResultsView> {
                     child: LayoutBuilder(
                       builder: (context, tableConstraints) {
                         final tableWidth = math.max(
-                          1478.0,
+                          1508.0,
                           tableConstraints.maxWidth - 2,
                         );
                         return Container(
@@ -177,6 +207,7 @@ class _ResultsViewState extends State<ResultsView> {
                                                   );
                                                   return Semantics(
                                                     button: true,
+                                                    selected: isSelected,
                                                     label:
                                                         '${item.part} ${localText(context, item.label)}',
                                                     child: InkWell(
@@ -224,6 +255,20 @@ class _ResultsViewState extends State<ResultsView> {
                                                                   colors.edge,
                                                               width: 5,
                                                             ),
+                                                            top: BorderSide(
+                                                              color: isSelected
+                                                                  ? p.accent
+                                                                  : Colors
+                                                                        .transparent,
+                                                              width: 2,
+                                                            ),
+                                                            right: BorderSide(
+                                                              color: isSelected
+                                                                  ? p.accent
+                                                                  : Colors
+                                                                        .transparent,
+                                                              width: 2,
+                                                            ),
                                                             bottom: BorderSide(
                                                               color: isSelected
                                                                   ? p.accent
@@ -232,7 +277,7 @@ class _ResultsViewState extends State<ResultsView> {
                                                                           alpha:
                                                                               .35,
                                                                         ),
-                                                              width: 1,
+                                                              width: 2,
                                                             ),
                                                           ),
                                                         ),
@@ -262,6 +307,7 @@ class _ResultsViewState extends State<ResultsView> {
                                                           ],
                                                           color: colors.ink,
                                                           status: item.status,
+                                                          selected: isSelected,
                                                           width: tableWidth,
                                                         ),
                                                       ),
@@ -346,6 +392,7 @@ class _ResultsViewState extends State<ResultsView> {
     bool header = false,
     Color? color,
     CheckStatus? status,
+    bool selected = false,
     required double width,
   }) {
     final widths = [
@@ -356,10 +403,29 @@ class _ResultsViewState extends State<ResultsView> {
       80.0,
       210.0,
       210.0,
-      width - 1118,
+      width - 1148,
     ];
     return Row(
       children: [
+        SizedBox(
+          width: 30,
+          child: selected
+              ? Container(
+                  key: const Key('selected-row-marker'),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Palette.of(context).accent,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: Icon(
+                    Icons.arrow_right,
+                    size: 20,
+                    color: Palette.of(context).onAccent,
+                  ),
+                )
+              : null,
+        ),
         for (var i = 0; i < values.length; i++)
           SizedBox(
             width: widths[i],

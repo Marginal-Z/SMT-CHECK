@@ -7,6 +7,29 @@ class SourceAnalysisBatch {
   final String kind, payload;
   final int partCount;
   const SourceAnalysisBatch(this.kind, this.payload, this.partCount);
+
+  /// Split only between complete evidence groups. A part's BOM and A/B rows
+  /// must remain together; no record or raw cell is truncated.
+  List<SourceAnalysisBatch>? split() {
+    final data = jsonDecode(payload) as Map<String, dynamic>;
+    final field = switch (kind) {
+      'parts' => 'parts',
+      'worksheet_context' => 'rows',
+      'position_ownership' => 'positions',
+      _ => '',
+    };
+    final entries = data[field];
+    if (entries is! List || entries.length < 2) return null;
+    final middle = entries.length ~/ 2;
+    return [
+      for (final half in [entries.sublist(0, middle), entries.sublist(middle)])
+        SourceAnalysisBatch(
+          kind,
+          jsonEncode({...data, field: half}),
+          kind == 'parts' ? half.length : 0,
+        ),
+    ];
+  }
 }
 
 class SourceAnalysisPlan {

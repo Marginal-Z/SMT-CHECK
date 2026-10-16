@@ -11,6 +11,7 @@ class AiWorkbench extends StatelessWidget {
   final String result;
   final ValueChanged<bool> onMode;
   final VoidCallback onRun, onCancel, onSettings, onCopy;
+  final VoidCallback? onResume;
   const AiWorkbench({
     super.key,
     required this.sourceMode,
@@ -26,6 +27,7 @@ class AiWorkbench extends StatelessWidget {
     required this.onCancel,
     required this.onSettings,
     required this.onCopy,
+    this.onResume,
   });
   @override
   Widget build(BuildContext context) {
@@ -97,6 +99,12 @@ class AiWorkbench extends StatelessWidget {
                             : onRun,
                       ),
                       if (busy) DeskButton('取消分析', onPressed: onCancel),
+                      if (!busy && sourceMode && onResume != null)
+                        DeskButton(
+                          '重试未完成批次',
+                          icon: Icons.refresh,
+                          onPressed: onResume,
+                        ),
                       if (sourceMode && total > 0)
                         LText(
                           '已完成 $completed / $total 批',
@@ -111,6 +119,8 @@ class AiWorkbench extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         if (busy) ...[
+          caption(context, '正在等待 AI 返回当前批次，可取消；每批最多等待 5 分钟。'),
+          const SizedBox(height: 6),
           LinearProgressIndicator(
             value: sourceMode && total > 0 ? completed / total : null,
             minHeight: 2,
@@ -357,6 +367,8 @@ class AiSettingsPanel extends StatelessWidget {
                             if (v != null) onLimit(v);
                           },
                   ),
+                  const SizedBox(height: 8),
+                  caption(context, '原始文件较大时建议每批 12000 或 24000 字符；超时后会自动拆小重试。'),
                   const SizedBox(height: 18),
                   Wrap(
                     spacing: 8,

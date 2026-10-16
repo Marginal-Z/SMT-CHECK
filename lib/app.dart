@@ -69,7 +69,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       settingsLoaded = false;
   int page = 0;
   int sessionEpoch = 0;
-  int aiEpoch = 0, batchLimit = 48000, sourceCompleted = 0, sourceTotal = 0;
+  int aiEpoch = 0, batchLimit = 24000, sourceCompleted = 0, sourceTotal = 0;
+  List<SourceAnalysisBatch> sourceBatches = [];
   bool aiSourceMode = true;
   String sourceAiText = '', connectionText = '';
   late String language;
@@ -171,6 +172,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     sourceAiText = '';
     sourceCompleted = 0;
     sourceTotal = 0;
+    sourceBatches = [];
     error = '';
   }
 
@@ -500,7 +502,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     }
   }
 
-  Future<void> analyzeSources() async {
+  Future<void> analyzeSources({bool resume = false}) async {
     if (busy || aiBusy) return;
     if (!sourcesReady) {
       notify(merged ? '请先导入 BOM、站位表 A 和 B' : '请先导入 BOM 和一份站位表');
@@ -518,47 +520,81 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       page = 2;
       aiSourceMode = true;
       aiBusy = true;
-      sourceCompleted = 0;
-      sourceTotal = 0;
-      sourceAiText = '';
+      if (!resume) {
+        sourceCompleted = 0;
+        sourceTotal = 0;
+        sourceBatches = [];
+        sourceAiText = '';
+      }
       activity = '正在准备原始文件分析…';
     });
     try {
-      final plan =
-          await (widget.sourcePlanner ?? prepareSourceAnalysisInBackground)(
-            inputBom,
-            stations,
-            inputRules,
-            limit,
-          );
-      if (!mounted || epoch != aiEpoch) return;
-      setState(() => sourceTotal = plan.batches.length);
+      if (!resume) {
+        final plan =
+            await (widget.sourcePlanner ?? prepareSourceAnalysisInBackground)(
+              inputBom,
+              stations,
+              inputRules,
+              limit,
+            );
+        if (!mounted || epoch != aiEpoch) return;
+        setState(() {
+          sourceBatches = [...plan.batches];
+          sourceTotal = sourceBatches.length;
+        });
+      }
       final scope = translate(
-        '将发送 ${plan.fileCount} 份文件中 ${plan.materialRows} 条物料记录及全部已读取的原始单元格、表头和公式文本，共 ${plan.batches.length} 批。包括排除料、候选料和额外工作表内容；不上传 Excel 二进制文件。',
+        '将发送 ${stations.length + 1} 份文件中 ${[inputBom, ...stations].fold(0, (count, file) => count + file.rows.length)} 条物料记录及全部已读取的原始单元格、表头和公式文本，共 $sourceTotal 批。包括排除料、候选料和额外工作表内容；不上传 Excel 二进制文件。',
         requestLanguage,
       );
       final confirmed = await confirmAi(
         config,
         '发送原始文件内容至 AI',
-        '$scope\n\n${[inputBom, ...stations].map((f) => f.name).join('\n')}',
+        '$scope${resume ? '\n${translate('仅重试未完成批次，保留已完成结果。', requestLanguage)}' : ''}\n\n${[inputBom, ...stations].map((f) => f.name).join('\n')}',
       );
       if (!mounted || epoch != aiEpoch) return;
       if (!confirmed) {
         setState(() {
-          sourceTotal = 0;
+          if (!resume) {
+            sourceTotal = 0;
+            sourceBatches = [];
+          }
           activity = '已取消发送';
         });
         return;
       }
       service = (widget.aiServiceFactory ?? AiService.new)();
       activeAi = service;
-      for (var index = 0; index < plan.batches.length; index++) {
-        final batch = plan.batches[index];
-        final text = await service.analyzeSourceBatch(
-          config,
-          batch,
-          language: requestLanguage,
+      if (resume) {
+        setState(
+          () =>
+              sourceAiText += '\n\n${translate('继续未完成批次', requestLanguage)}\n',
         );
+      }
+      for (var index = sourceCompleted; index < sourceBatches.length; index++) {
+        final batch = sourceBatches[index];
+        String text;
+        try {
+          text = await service!.analyzeSourceBatch(
+            config,
+            batch,
+            language: requestLanguage,
+          );
+        } on AiRequestException catch (e) {
+          if (!mounted || epoch != aiEpoch) return;
+          final smaller = e.canSplitBatch ? batch.split() : null;
+          if (smaller == null) rethrow;
+          service!.close();
+          service = (widget.aiServiceFactory ?? AiService.new)();
+          activeAi = service;
+          setState(() {
+            sourceBatches.replaceRange(index, index + 1, smaller);
+            sourceTotal = sourceBatches.length;
+            activity = '本批响应超时或超出接口限制，已自动拆小重试';
+          });
+          index--;
+          continue;
+        }
         if (!mounted || epoch != aiEpoch) return;
         final scopeLabel = switch (batch.kind) {
           'parts' => '物料字段核对',
@@ -568,7 +604,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         setState(() {
           sourceCompleted = index + 1;
           sourceAiText +=
-              '${sourceAiText.isEmpty ? '' : '\n\n'}${translate('第 ${index + 1} / ${plan.batches.length} 批', requestLanguage)} · ${translate(scopeLabel, requestLanguage)}\n$text';
+              '${sourceAiText.isEmpty ? '' : '\n\n'}${translate('第 ${index + 1} / $sourceTotal 批', requestLanguage)} · ${translate(scopeLabel, requestLanguage)}\n$text';
         });
       }
       if (mounted && epoch == aiEpoch) {
@@ -947,6 +983,13 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       }
     },
     onCancel: () => setState(() => stopAi(cancelled: true)),
+    onResume:
+        sourceCompleted < sourceBatches.length &&
+            sourceTotal > 0 &&
+            sourcesReady &&
+            !busy
+        ? () => unawaited(analyzeSources(resume: true))
+        : null,
     onSettings: () => setState(() => page = 3),
     onCopy: () {
       Clipboard.setData(

@@ -67,7 +67,7 @@ class Palette {
           dark
               ? (selected ? const Color(0xFF77313B) : const Color(0xFF5A242B))
               : (selected ? const Color(0xFFF1A9B2) : const Color(0xFFF8CBCF)),
-      dark ? const Color(0xFFFFCBD0) : const Color(0xFF86121D),
+          dark ? const Color(0xFFFFCBD0) : const Color(0xFF86121D),
           dark ? const Color(0xFFFF8493) : bad,
           const Color(0xFFB21E2B),
           Colors.white,
