@@ -1,0 +1,423 @@
+import 'package:flutter/material.dart';
+
+import '../core/models.dart';
+import '../core/positions.dart';
+import 'design.dart';
+
+class ResultsView extends StatefulWidget {
+  final CheckReport report;
+  final CheckItem? selected;
+  final ValueChanged<CheckItem> onSelect;
+  final ValueChanged<CheckItem>? onAi;
+  final ValueChanged<bool> onExport;
+  const ResultsView({
+    super.key,
+    required this.report,
+    required this.selected,
+    required this.onSelect,
+    required this.onAi,
+    required this.onExport,
+  });
+  @override
+  State<ResultsView> createState() => _ResultsViewState();
+}
+
+class _ResultsViewState extends State<ResultsView> {
+  CheckStatus? filter;
+  String query = '';
+  final horizontal = ScrollController(), vertical = ScrollController();
+  @override
+  void dispose() {
+    horizontal.dispose();
+    vertical.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    final list = widget.report.items
+        .where(
+          (i) =>
+              (filter == null || filter == i.status) &&
+              '${i.part} ${i.description} ${i.reasons.join(' ')} ${i.bom.map((r) => r.positionsText).join(' ')} ${i.smt.map((r) => r.positionsText).join(' ')}'
+                  .toLowerCase()
+                  .contains(query.toLowerCase()),
+        )
+        .toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 6,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (final (label, status) in [
+              ('全部', null),
+              ('异常', CheckStatus.error),
+              ('一致', CheckStatus.pass),
+              ('已排除', CheckStatus.excluded),
+              ('候选料', CheckStatus.candidate),
+            ])
+              DeskButton(
+                label,
+                selected: filter == status,
+                onPressed: () => setState(() => filter = status),
+              ),
+            SizedBox(
+              width: 200,
+              child: TextField(
+                onChanged: (v) => setState(() => query = v),
+                style: const TextStyle(fontSize: 12),
+                decoration: const InputDecoration(
+                  hintText: '搜索料号、位号或原因',
+                  prefixIcon: Icon(Icons.search, size: 17),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 9,
+                  ),
+                ),
+              ),
+            ),
+            DeskButton(
+              '导出 CSV',
+              icon: Icons.download_outlined,
+              onPressed: () => widget.onExport(false),
+            ),
+            DeskButton('JSON', onPressed: () => widget.onExport(true)),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final showDetail = c.maxWidth > 1160;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: p.panel,
+                        border: Border.all(color: p.line),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Scrollbar(
+                        controller: horizontal,
+                        thumbVisibility: true,
+                        notificationPredicate: (n) =>
+                            n.metrics.axis == Axis.horizontal,
+                        child: SingleChildScrollView(
+                          controller: horizontal,
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(
+                            width: 1120,
+                            child: Column(
+                              children: [
+                                Container(
+                                  height: 38,
+                                  color: p.hover,
+                                  child: rowCells(context, [
+                                    '状态',
+                                    '料号',
+                                    '品名 / 物料描述',
+                                    'BOM数量',
+                                    'SMT数量',
+                                    '核对结果 / 异常原因',
+                                  ], header: true),
+                                ),
+                                Expanded(
+                                  child: list.isEmpty
+                                      ? const Center(
+                                          child: Text(
+                                            '没有符合筛选条件的记录',
+                                            style: TextStyle(fontSize: 12),
+                                          ),
+                                        )
+                                      : Scrollbar(
+                                          controller: vertical,
+                                          child: ListView.builder(
+                                            controller: vertical,
+                                            itemCount: list.length,
+                                            itemExtent: 57,
+                                            itemBuilder: (context, index) {
+                                              final item = list[index],
+                                                  isSelected =
+                                                      widget.selected == item;
+                                              final color =
+                                                  item.status ==
+                                                      CheckStatus.pass
+                                                  ? good
+                                                  : item.status ==
+                                                        CheckStatus.error
+                                                  ? bad
+                                                  : p.muted;
+                                              return Semantics(
+                                                button: true,
+                                                label:
+                                                    '${item.part} ${item.label}',
+                                                child: InkWell(
+                                                  onTap: () {
+                                                    widget.onSelect(item);
+                                                    if (!showDetail) {
+                                                      showDialog<void>(
+                                                        context: context,
+                                                        builder: (context) => Dialog(
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  4,
+                                                                ),
+                                                          ),
+                                                          child: ConstrainedBox(
+                                                            constraints:
+                                                                const BoxConstraints(
+                                                                  maxWidth: 690,
+                                                                  maxHeight:
+                                                                      760,
+                                                                ),
+                                                            child: ItemDetail(
+                                                              item: item,
+                                                              onAi: widget.onAi,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      );
+                                                    }
+                                                  },
+                                                  child: Container(
+                                                    decoration: BoxDecoration(
+                                                      color: color.withValues(
+                                                        alpha: p.dark
+                                                            ? .10
+                                                            : .045,
+                                                      ),
+                                                      border: Border(
+                                                        left: BorderSide(
+                                                          color: isSelected
+                                                              ? p.text
+                                                              : color,
+                                                          width: 3,
+                                                        ),
+                                                        bottom: BorderSide(
+                                                          color: p.line,
+                                                          width: .6,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    child: rowCells(context, [
+                                                      item.label,
+                                                      item.part,
+                                                      item.description,
+                                                      numberText(
+                                                        item.bomQuantity,
+                                                      ),
+                                                      numberText(
+                                                        item.smtQuantity,
+                                                      ),
+                                                      item.reasons.join('；'),
+                                                    ], color: color),
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (showDetail) ...[
+                    const SizedBox(width: 14),
+                    SizedBox(
+                      width: 340,
+                      child: Pane(
+                        padding: EdgeInsets.zero,
+                        child: widget.selected == null
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(22),
+                                  child: caption(
+                                    context,
+                                    '选择左侧一条物料，查看字段对照、异常原因和原文件证据。',
+                                  ),
+                                ),
+                              )
+                            : ItemDetail(
+                                item: widget.selected!,
+                                onAi: widget.onAi,
+                              ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 6),
+        caption(
+          context,
+          '显示 ${list.length} / ${widget.report.items.length} 条记录 · 点击行查看完整差异 · 已排除和候选料单独统计',
+        ),
+      ],
+    );
+  }
+
+  Widget rowCells(
+    BuildContext context,
+    List<String> values, {
+    bool header = false,
+    Color? color,
+  }) {
+    const widths = [77.0, 190.0, 270.0, 80.0, 80.0, 417.0];
+    return Row(
+      children: [
+        for (var i = 0; i < values.length; i++)
+          SizedBox(
+            width: widths[i],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Tooltip(
+                message: values[i],
+                child: Text(
+                  values[i],
+                  maxLines: header ? 1 : 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: header ? 11 : 12,
+                    height: 1.55,
+                    fontWeight: header || i == 1
+                        ? FontWeight.w600
+                        : FontWeight.w400,
+                    color: i == 0
+                        ? color
+                        : header
+                        ? Palette.of(context).muted
+                        : Palette.of(context).text,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class ItemDetail extends StatelessWidget {
+  final CheckItem item;
+  final ValueChanged<CheckItem>? onAi;
+  const ItemDetail({super.key, required this.item, required this.onAi});
+  @override
+  Widget build(BuildContext context) {
+    final color = item.status == CheckStatus.error
+        ? bad
+        : item.status == CheckStatus.pass
+        ? good
+        : Palette.of(context).muted;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            item.label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 9),
+          SelectableText(
+            item.part.isEmpty ? '空料号' : item.part,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            '核对原因',
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 8),
+          for (final reason in item.reasons)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 9),
+              child: SelectableText(
+                reason,
+                style: TextStyle(fontSize: 12, height: 1.6, color: color),
+              ),
+            ),
+          if (item.status == CheckStatus.error)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: DeskButton(
+                'AI 分析此项',
+                icon: Icons.auto_awesome_outlined,
+                onPressed: onAi == null
+                    ? null
+                    : () {
+                        if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+                        onAi!(item);
+                      },
+              ),
+            ),
+          const Divider(height: 24),
+          for (final (title, rows) in [
+            ('T100-BOM 原始记录', item.bom),
+            ('SMT 站位表原始记录', item.smt),
+          ]) ...[
+            Text(
+              title,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            if (rows.isEmpty) caption(context, '没有对应记录'),
+            for (final r in rows)
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Palette.of(context).hover,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SelectableText(
+                      '${r.side.isEmpty ? '' : '${r.side} · '}${r.sheet} / 第 ${r.row} 行${r.station.isEmpty ? '' : ' / 站位 ${r.station}'}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    SelectableText(
+                      r.description,
+                      style: const TextStyle(fontSize: 12, height: 1.6),
+                    ),
+                    const SizedBox(height: 7),
+                    SelectableText(
+                      '数量：${r.quantityText.isEmpty ? '空' : r.quantityText}\n位号：${r.positionsText.isEmpty ? '空' : r.positionsText}',
+                      style: const TextStyle(fontSize: 12, height: 1.7),
+                    ),
+                    const SizedBox(height: 6),
+                    caption(context, r.file),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ),
+    );
+  }
+}
