@@ -163,8 +163,8 @@ class CheckItem {
   String get smtPositions => smt.map((r) => r.positionsText).join('\n');
   String get description => (bom.isNotEmpty ? bom : smt).first.description;
   String get label => switch (status) {
-    CheckStatus.pass => '一致',
-    CheckStatus.error => '异常',
+    CheckStatus.pass => 'PASS',
+    CheckStatus.error => 'NG',
     CheckStatus.excluded => '已排除',
     CheckStatus.candidate => '候选替代料',
   };

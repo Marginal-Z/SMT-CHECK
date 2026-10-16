@@ -5,7 +5,7 @@ import '../l10n/localization.dart';
 import 'design.dart';
 import 'localized_text.dart';
 
-const desktopPages = ['核对工作台', '导入与规则', 'AI 分析核对', '设置', '使用说明'];
+const desktopPages = ['核对工作台', 'AI 分析核对', '设置', '使用说明'];
 
 class DesktopShell extends StatelessWidget {
   final int page;
@@ -114,7 +114,6 @@ class DesktopShell extends StatelessWidget {
                                         Icon(
                                           [
                                             Icons.table_chart_outlined,
-                                            Icons.rule_outlined,
                                             Icons.auto_awesome_outlined,
                                             Icons.settings_outlined,
                                             Icons.help_outline,
@@ -191,7 +190,7 @@ class DesktopShell extends StatelessWidget {
                         ? Icons.error_outline
                         : Icons.check_circle_outline,
                     size: 12,
-                    color: hasError ? p.result(CheckStatus.error).ink : p.muted,
+                    color: hasError ? p.alertText : p.muted,
                   ),
                   const SizedBox(width: 6),
                   Expanded(
@@ -202,7 +201,7 @@ class DesktopShell extends StatelessWidget {
                       style: TextStyle(fontSize: 11, color: p.muted),
                     ),
                   ),
-                  const Text('SMT-CHECK 1.5.0', style: TextStyle(fontSize: 10)),
+                  const Text('SMT-CHECK 1.5.1', style: TextStyle(fontSize: 10)),
                 ],
               ),
             ),

@@ -1,5 +1,13 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '核对完成 · {pass} 项 PASS / {count} 项 NG': [
+    'Verification complete · {pass} PASS / {count} NG',
+    'ตรวจสอบเสร็จแล้ว · PASS {pass} รายการ / NG {count} รายการ',
+  ],
+  '主题色即时生效并自动保存；PASS 为绿色，NG、已排除和候选料为红色。': [
+    'Accent changes apply immediately and are saved. PASS is green; NG, excluded and candidate materials are red.',
+    'สีธีมเปลี่ยนทันทีและบันทึกอัตโนมัติ PASS เป็นสีเขียว ส่วน NG วัสดุที่ยกเว้นและวัสดุทางเลือกเป็นสีแดง',
+  ],
   'AI 未返回有效的异常清单，本批未完成，请重试未完成批次。': [
     'AI did not return a valid anomaly list. This batch is incomplete; retry unfinished batches.',
     'AI ไม่ได้ส่งรายการผิดปกติที่ถูกต้อง ชุดนี้ยังไม่เสร็จ โปรดลองชุดที่ยังไม่เสร็จอีกครั้ง',

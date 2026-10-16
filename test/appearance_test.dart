@@ -24,7 +24,9 @@ void main() {
       for (final accent in ThemeAccent.values) {
         final p = Palette(dark, accent);
         expect(contrast(p.accent, p.onAccent), greaterThanOrEqualTo(4.5));
-        for (final status in [CheckStatus.pass, CheckStatus.error]) {
+        expect(contrast(p.alertText, p.panel), greaterThanOrEqualTo(4.5));
+        expect(contrast(p.alertText, p.bg), greaterThanOrEqualTo(4.5));
+        for (final status in CheckStatus.values) {
           for (final selected in [false, true]) {
             final colors = p.result(status, selected: selected);
             expect(colors.fill.a, 1);

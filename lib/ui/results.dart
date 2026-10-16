@@ -65,8 +65,8 @@ class _ResultsViewState extends State<ResultsView> {
               children: [
                 for (final (label, status) in [
                   ('全部', null),
-                  ('异常', CheckStatus.error),
-                  ('一致', CheckStatus.pass),
+                  ('NG', CheckStatus.error),
+                  ('PASS', CheckStatus.pass),
                   ('已排除物料', CheckStatus.excluded),
                   ('候选料', CheckStatus.candidate),
                 ])
@@ -411,11 +411,8 @@ class _ResultsViewState extends State<ResultsView> {
                 message: header || i == 0
                     ? localText(context, values[i])
                     : values[i],
-                child:
-                    i == 0 &&
-                        (status == CheckStatus.pass ||
-                            status == CheckStatus.error)
-                    ? ResultBadge(status: status!, label: values[i])
+                child: i == 0 && status != null
+                    ? ResultBadge(status: status, label: values[i])
                     : Text(
                         header || i == 0
                             ? localText(context, values[i])
@@ -451,7 +448,10 @@ class ItemDetail extends StatelessWidget {
   const ItemDetail({super.key, required this.item, required this.onAi});
   @override
   Widget build(BuildContext context) {
-    final color = Palette.of(context).result(item.status).ink;
+    final p = Palette.of(context);
+    final color = item.status == CheckStatus.pass
+        ? p.result(item.status).ink
+        : p.alertText;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -486,7 +486,12 @@ class ItemDetail extends StatelessWidget {
               padding: const EdgeInsets.only(bottom: 9),
               child: SelectableText(
                 localText(context, reason),
-                style: TextStyle(fontSize: 12, height: 1.6, color: color),
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.6,
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           if (item.status == CheckStatus.error)

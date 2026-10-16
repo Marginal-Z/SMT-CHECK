@@ -69,6 +69,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       aiBusy = false,
       settingsLoaded = false;
   int page = 0;
+  int settingsSection = 0;
   int sessionEpoch = 0;
   int aiEpoch = 0, batchLimit = 24000, sourceCompleted = 0, sourceTotal = 0;
   List<SourceAnalysisBatch> sourceBatches = [];
@@ -308,7 +309,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         error = '';
         page = 0;
         activity =
-            '核对完成 · ${result.count(CheckStatus.pass)} 项一致 / ${result.errors.length} 项异常';
+            '核对完成 · ${result.count(CheckStatus.pass)} 项 PASS / ${result.errors.length} 项 NG';
       });
     } catch (e) {
       if (mounted && epoch == sessionEpoch) setState(() => error = '核对失败：$e');
@@ -405,7 +406,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       config.endpoint;
       return true;
     } catch (e) {
-      setState(() => page = 3);
+      setState(() {
+        page = 2;
+        settingsSection = 0;
+      });
       notify(e.toString());
       return false;
     }
@@ -477,7 +481,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         receivedCharacters = 0;
         aiStartedAt = null;
       }
-      page = test ? 3 : 2;
+      page = test ? 2 : 1;
+      if (test) settingsSection = 0;
       if (test) {
         connectionText = translate('正在测试连接…', language);
       } else {
@@ -561,7 +566,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         limit = batchLimit;
     AiService? service;
     setState(() {
-      page = 2;
+      page = 1;
       aiSourceMode = true;
       aiBusy = true;
       aiStage = AiStage.preparing;
@@ -768,9 +773,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             },
             child: switch (page) {
               0 => workspace(context),
-              1 => rulesPage(context),
-              2 => aiPage(context),
-              3 => settingsPage(context),
+              1 => aiPage(context),
+              2 => settingsPage(context),
               _ => helpPage(context),
             },
           ),
@@ -857,9 +861,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                     child: SelectableText(
                       localText(context, error),
                       style: TextStyle(
-                        color: Palette.of(context)
-                            .result(CheckStatus.error)
-                            .ink,
+                        color: Palette.of(context).alertText,
                         fontSize: 12,
                       ),
                     ),
@@ -921,7 +923,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               DeskButton(
                 '查看排除规则',
                 icon: Icons.rule_outlined,
-                onPressed: () => setState(() => page = 1),
+                onPressed: () => setState(() {
+                  page = 2;
+                  settingsSection = 1;
+                }),
               ),
             ],
           ),
@@ -1063,7 +1068,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             !busy
         ? () => unawaited(analyzeSources(resume: true))
         : null,
-    onSettings: () => setState(() => page = 3),
+    onSettings: () => setState(() {
+      page = 2;
+      settingsSection = 0;
+    }),
     onCopy: () {
       Clipboard.setData(
         ClipboardData(text: aiSourceMode ? sourceAiText : aiText),
@@ -1072,7 +1080,39 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     },
   );
 
-  Widget settingsPage(BuildContext context) => AiSettingsPanel(
+  Widget settingsPage(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const LText(
+        '设置',
+        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 14),
+      Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        children: [
+          DeskButton(
+            '外观与 AI 接口',
+            selected: settingsSection == 0,
+            onPressed: () => setState(() => settingsSection = 0),
+          ),
+          DeskButton(
+            '导入与规则',
+            selected: settingsSection == 1,
+            icon: Icons.rule_outlined,
+            onPressed: () => setState(() => settingsSection = 1),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      Expanded(
+        child: settingsSection == 0 ? aiSettings(context) : rulesPage(context),
+      ),
+    ],
+  );
+
+  Widget aiSettings(BuildContext context) => AiSettingsPanel(
     url: url,
     model: model,
     apiKey: apiKey,

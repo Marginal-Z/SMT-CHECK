@@ -87,7 +87,7 @@ class AiFindingsView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: p.result(CheckStatus.error).ink,
+                      color: p.alertText,
                     ),
                   ),
                 ],
@@ -95,7 +95,12 @@ class AiFindingsView extends StatelessWidget {
               const SizedBox(height: 10),
               SelectableText(
                 item.reason,
-                style: TextStyle(fontSize: 13, height: 1.6, color: p.text),
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.6,
+                  color: p.alertText,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               if (item.bom.isNotEmpty || item.smt.isNotEmpty) ...[
                 const SizedBox(height: 12),

@@ -51,16 +51,24 @@ void main() {
               .pop();
           await tester.pumpAndSettle();
         }
-        for (final title in ['导入与规则', 'AI 分析核对', '设置', '使用说明']) {
+        for (final title in ['AI 分析核对', '设置', '使用说明']) {
           await tester.tap(find.byTooltip(translate(title, language)));
           await tester.pumpAndSettle();
           final expected = {
-            '导入与规则': '非贴片物料排除规则',
             'AI 分析核对': '原始文件核对',
             '设置': 'API 基础地址',
             '使用说明': '核对规则与操作',
           }[title]!;
           expect(find.text(translate(expected, language)), findsOneWidget);
+          if (title == '设置') {
+            await tester.tap(find.text(translate('导入与规则', language)));
+            await tester.pumpAndSettle();
+            expect(find.text(translate('非贴片物料排除规则', language)), findsOneWidget);
+            expect(find.text(translate('导入审计', language)), findsOneWidget);
+            await tester.tap(find.text(translate('外观与 AI 接口', language)));
+            await tester.pumpAndSettle();
+            expect(find.text(translate('API 基础地址', language)), findsOneWidget);
+          }
           expect(tester.takeException(), isNull);
         }
       });

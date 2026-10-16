@@ -52,6 +52,8 @@ class Palette {
   Color get muted => dark ? const Color(0xFFAAAAAA) : const Color(0xFF6D6D6D);
   Color get line => dark ? const Color(0xFF363636) : const Color(0xFFE1E1E1);
   Color get hover => dark ? const Color(0xFF2C2C2C) : const Color(0xFFF0F0F0);
+  Color get alertText =>
+      dark ? const Color(0xFFFF554A) : const Color(0xFFE00012);
   ResultColors result(CheckStatus status, {bool selected = false}) =>
       switch (status) {
         CheckStatus.pass => ResultColors(
@@ -61,21 +63,12 @@ class Palette {
           good,
           const Color(0xFF101A13),
         ),
-        CheckStatus.error => ResultColors(
+        _ => ResultColors(
           dark ? const Color(0xFF621E1B) : const Color(0xFFFFAAA3),
           dark ? const Color(0xFFFFE5E2) : const Color(0xFF701006),
           bad,
           bad,
           const Color(0xFF240200),
-        ),
-        _ => ResultColors(
-          selected
-              ? Color.alphaBlend(text.withValues(alpha: .08), hover)
-              : hover,
-          muted,
-          line,
-          hover,
-          text,
         ),
       };
   static Palette of(BuildContext context) {
@@ -113,7 +106,7 @@ ThemeData desktopTheme(bool dark, [ThemeAccent accent = ThemeAccent.black]) {
           onPrimary: p.onAccent,
           onSecondary: p.onAccent,
           surface: p.panel,
-          error: p.result(CheckStatus.error).ink,
+          error: p.alertText,
         ),
     textSelectionTheme: TextSelectionThemeData(
       cursorColor: p.accent,
@@ -323,28 +316,28 @@ class ResultBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Palette.of(context).result(status);
-    final isResult = status == CheckStatus.pass || status == CheckStatus.error;
     return Tooltip(
       message: localText(context, label),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: isResult ? colors.badge : colors.fill,
+          color: colors.badge,
           borderRadius: BorderRadius.circular(3),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (isResult) ...[
-              Icon(
-                status == CheckStatus.pass
-                    ? Icons.check_circle_outline
-                    : Icons.error_outline,
-                size: 14,
-                color: colors.onBadge,
-              ),
-              const SizedBox(width: 5),
-            ],
+            Icon(
+              switch (status) {
+                CheckStatus.pass => Icons.check_circle_outline,
+                CheckStatus.error => Icons.error_outline,
+                CheckStatus.excluded => Icons.block,
+                CheckStatus.candidate => Icons.help_outline,
+              },
+              size: 14,
+              color: colors.onBadge,
+            ),
+            const SizedBox(width: 5),
             Flexible(
               child: LText(
                 label,
@@ -353,7 +346,7 @@ class ResultBadge extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: isResult ? colors.onBadge : colors.ink,
+                  color: colors.onBadge,
                 ),
               ),
             ),

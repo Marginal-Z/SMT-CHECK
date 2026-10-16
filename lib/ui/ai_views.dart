@@ -256,13 +256,6 @@ class AiSettingsPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const LText(
-              '设置',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            caption(context, '外观与 AI 接口'),
-            const SizedBox(height: 22),
             Pane(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -335,7 +328,7 @@ class AiSettingsPanel extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 10),
-                  caption(context, '主题色即时生效并自动保存；一致为绿色，异常为红色。'),
+                  caption(context, '主题色即时生效并自动保存；PASS 为绿色，NG、已排除和候选料为红色。'),
                 ],
               ),
             ),

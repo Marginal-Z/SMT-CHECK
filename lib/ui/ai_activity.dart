@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../services/ai_findings.dart';
-import '../core/models.dart';
 import 'design.dart';
 import 'localized_text.dart';
 
@@ -175,9 +174,7 @@ class _AiActivityState extends State<AiActivity> {
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.6,
-                  color: widget.stage == AiStage.failed
-                      ? p.result(CheckStatus.error).ink
-                      : p.muted,
+                  color: widget.stage == AiStage.failed ? p.alertText : p.muted,
                 ),
               ),
             ),
