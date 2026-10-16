@@ -200,6 +200,50 @@ class Pane extends StatelessWidget {
   }
 }
 
+class FilterTab extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+  const FilterTab(
+    this.label, {
+    super.key,
+    required this.selected,
+    required this.onPressed,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Semantics(
+      selected: selected,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(
+              color: selected ? p.text : Colors.transparent,
+              width: 2,
+            ),
+          ),
+        ),
+        child: TextButton(
+          style: TextButton.styleFrom(
+            foregroundColor: selected ? p.text : p.muted,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+            shape: const RoundedRectangleBorder(),
+          ),
+          onPressed: onPressed,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 Widget caption(BuildContext context, String text) => Text(
   localText(context, text),
   style: TextStyle(fontSize: 12, color: Palette.of(context).muted, height: 1.6),

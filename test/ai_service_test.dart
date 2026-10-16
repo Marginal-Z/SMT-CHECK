@@ -105,7 +105,7 @@ void main() {
         const AiConfig(
           baseUrl: 'https://example.com',
           model: 'm',
-          apiKey: 'secret-abc',
+          apiKey: ' secret-abc ',
         ),
       ),
       throwsA(

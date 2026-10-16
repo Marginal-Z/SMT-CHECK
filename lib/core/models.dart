@@ -54,19 +54,38 @@ class MaterialRow {
   };
 }
 
+class SourceRow {
+  final int row;
+  final Map<String, String> cells, formulas;
+  const SourceRow(this.row, this.cells, {this.formulas = const {}});
+  Map<String, dynamic> toJson() => {
+    'row': row,
+    'cells': cells,
+    if (formulas.isNotEmpty) 'formulas': formulas,
+  };
+}
+
+class SourceSheet {
+  final String name, visibility;
+  final List<SourceRow> rows;
+  const SourceSheet(this.name, this.rows, {this.visibility = 'visible'});
+}
+
 class ImportedFile {
   final String path;
   final InputKind kind;
   final List<MaterialRow> rows;
   final List<String> notes;
   final List<String> mappings;
+  final List<SourceSheet> sheets;
   const ImportedFile(
     this.path,
     this.kind,
     this.rows,
     this.notes,
-    this.mappings,
-  );
+    this.mappings, {
+    this.sheets = const [],
+  });
   String get name => path.replaceAll('\\', '/').split('/').last;
 }
 

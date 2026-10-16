@@ -1,5 +1,7 @@
 import 'localized_text.dart';
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
@@ -27,6 +29,7 @@ class ResultsView extends StatefulWidget {
 class _ResultsViewState extends State<ResultsView> {
   CheckStatus? filter;
   String query = '';
+  bool detailsOpen = false;
   final horizontal = ScrollController(), vertical = ScrollController();
   @override
   void dispose() {
@@ -62,7 +65,7 @@ class _ResultsViewState extends State<ResultsView> {
               ('已排除物料', CheckStatus.excluded),
               ('候选料', CheckStatus.candidate),
             ])
-              DeskButton(
+              FilterTab(
                 '${localText(context, label)} (${status == null ? widget.report.items.length : widget.report.count(status)})',
                 selected: filter == status,
                 onPressed: () => setState(() => filter = status),
@@ -88,6 +91,13 @@ class _ResultsViewState extends State<ResultsView> {
               onPressed: () => widget.onExport(false),
             ),
             DeskButton('JSON', onPressed: () => widget.onExport(true)),
+            DeskButton(
+              detailsOpen ? '收起详情' : '展开详情',
+              icon: Icons.vertical_split_outlined,
+              onPressed: widget.selected == null
+                  ? null
+                  : () => setState(() => detailsOpen = !detailsOpen),
+            ),
           ],
         ),
         const SizedBox(height: 10),
@@ -99,162 +109,226 @@ class _ResultsViewState extends State<ResultsView> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: p.panel,
-                        border: Border.all(color: p.line),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Scrollbar(
-                        controller: horizontal,
-                        thumbVisibility: true,
-                        notificationPredicate: (n) =>
-                            n.metrics.axis == Axis.horizontal,
-                        child: SingleChildScrollView(
-                          controller: horizontal,
-                          scrollDirection: Axis.horizontal,
-                          child: SizedBox(
-                            width: 1524,
-                            child: Column(
-                              children: [
-                                Container(
-                                  height: 38,
-                                  color: p.hover,
-                                  child: rowCells(context, [
-                                    '状态',
-                                    '料号',
-                                    '品名 / 物料描述',
-                                    'BOM数量',
-                                    'SMT数量',
-                                    'BOM插件位置',
-                                    'SMT站位表位号',
-                                    '核对结果 / 异常原因',
-                                  ], header: true),
-                                ),
-                                Expanded(
-                                  child: list.isEmpty
-                                      ? const Center(
-                                          child: LText(
-                                            '没有符合筛选条件的记录',
-                                            style: TextStyle(fontSize: 12),
-                                          ),
-                                        )
-                                      : Scrollbar(
-                                          controller: vertical,
-                                          child: ListView.builder(
-                                            controller: vertical,
-                                            itemCount: list.length,
-                                            itemExtent: 57,
-                                            itemBuilder: (context, index) {
-                                              final item = list[index],
-                                                  isSelected =
-                                                      widget.selected == item;
-                                              final color =
-                                                  item.status ==
-                                                      CheckStatus.pass
-                                                  ? good
-                                                  : item.status ==
-                                                        CheckStatus.error
-                                                  ? bad
-                                                  : p.muted;
-                                              return Semantics(
-                                                button: true,
-                                                label:
-                                                    '${item.part} ${item.label}',
-                                                child: InkWell(
-                                                  onTap: () {
-                                                    widget.onSelect(item);
-                                                    if (!showDetail) {
-                                                      showDialog<void>(
-                                                        context: context,
-                                                        builder: (context) => Dialog(
-                                                          shape: RoundedRectangleBorder(
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  4,
+                    child: LayoutBuilder(
+                      builder: (context, tableConstraints) {
+                        final tableWidth = math.max(
+                          1442.0,
+                          tableConstraints.maxWidth - 2,
+                        );
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: p.panel,
+                            border: Border.all(color: p.line),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Scrollbar(
+                            controller: horizontal,
+                            thumbVisibility: true,
+                            notificationPredicate: (n) =>
+                                n.metrics.axis == Axis.horizontal,
+                            child: SingleChildScrollView(
+                              controller: horizontal,
+                              scrollDirection: Axis.horizontal,
+                              child: SizedBox(
+                                width: tableWidth,
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      height: 38,
+                                      color: p.hover,
+                                      child: rowCells(
+                                        context,
+                                        [
+                                          '状态',
+                                          '料号',
+                                          '品名 / 物料描述',
+                                          'BOM数量',
+                                          'SMT数量',
+                                          'BOM插件位置',
+                                          'SMT站位表位号',
+                                          '核对结果 / 异常原因',
+                                        ],
+                                        header: true,
+                                        width: tableWidth,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: list.isEmpty
+                                          ? const Center(
+                                              child: LText(
+                                                '没有符合筛选条件的记录',
+                                                style: TextStyle(fontSize: 12),
+                                              ),
+                                            )
+                                          : Scrollbar(
+                                              controller: vertical,
+                                              child: ListView.builder(
+                                                controller: vertical,
+                                                itemCount: list.length,
+                                                itemExtent: 57,
+                                                itemBuilder: (context, index) {
+                                                  final item = list[index],
+                                                      isSelected =
+                                                          widget.selected ==
+                                                          item;
+                                                  final color =
+                                                      item.status ==
+                                                          CheckStatus.pass
+                                                      ? good
+                                                      : item.status ==
+                                                            CheckStatus.error
+                                                      ? bad
+                                                      : p.muted;
+                                                  return Semantics(
+                                                    button: true,
+                                                    label:
+                                                        '${item.part} ${localText(context, item.label)}',
+                                                    child: InkWell(
+                                                      onTap: () {
+                                                        widget.onSelect(item);
+                                                        setState(
+                                                          () => detailsOpen =
+                                                              true,
+                                                        );
+                                                        if (!showDetail) {
+                                                          showDialog<void>(
+                                                            context: context,
+                                                            builder: (context) => Dialog(
+                                                              shape: RoundedRectangleBorder(
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      4,
+                                                                    ),
+                                                              ),
+                                                              child: ConstrainedBox(
+                                                                constraints:
+                                                                    const BoxConstraints(
+                                                                      maxWidth:
+                                                                          690,
+                                                                      maxHeight:
+                                                                          760,
+                                                                    ),
+                                                                child: ItemDetail(
+                                                                  item: item,
+                                                                  onAi: widget
+                                                                      .onAi,
                                                                 ),
-                                                          ),
-                                                          child: ConstrainedBox(
-                                                            constraints:
-                                                                const BoxConstraints(
-                                                                  maxWidth: 690,
-                                                                  maxHeight:
-                                                                      760,
-                                                                ),
-                                                            child: ItemDetail(
-                                                              item: item,
-                                                              onAi: widget.onAi,
+                                                              ),
                                                             ),
-                                                          ),
-                                                        ),
-                                                      );
-                                                    }
-                                                  },
-                                                  child: Container(
-                                                    decoration: BoxDecoration(
-                                                      color: color.withValues(
-                                                        alpha: p.dark
-                                                            ? .10
-                                                            : .045,
-                                                      ),
-                                                      border: Border(
-                                                        left: BorderSide(
-                                                          color: isSelected
-                                                              ? p.text
-                                                              : color,
-                                                          width: 3,
-                                                        ),
-                                                        bottom: BorderSide(
-                                                          color: p.line,
-                                                          width: .6,
+                                                          );
+                                                        }
+                                                      },
+                                                      child: Container(
+                                                        decoration:
+                                                            BoxDecoration(
+                                                              color: color
+                                                                  .withValues(
+                                                                    alpha:
+                                                                        p.dark
+                                                                        ? .10
+                                                                        : .045,
+                                                                  ),
+                                                              border: Border(
+                                                                left: BorderSide(
+                                                                  color:
+                                                                      isSelected
+                                                                      ? p.text
+                                                                      : color,
+                                                                  width: 3,
+                                                                ),
+                                                                bottom:
+                                                                    BorderSide(
+                                                                      color: p
+                                                                          .line,
+                                                                      width: .6,
+                                                                    ),
+                                                              ),
+                                                            ),
+                                                        child: rowCells(
+                                                          context,
+                                                          [
+                                                            item.label,
+                                                            item.part,
+                                                            item.description,
+                                                            numberText(
+                                                              item.bomQuantity,
+                                                            ),
+                                                            numberText(
+                                                              item.smtQuantity,
+                                                            ),
+                                                            item.bomPositions,
+                                                            item.smtPositions,
+                                                            item.reasons
+                                                                .map(
+                                                                  (r) =>
+                                                                      localText(
+                                                                        context,
+                                                                        r,
+                                                                      ),
+                                                                )
+                                                                .join('；'),
+                                                          ],
+                                                          color: color,
+                                                          width: tableWidth,
                                                         ),
                                                       ),
                                                     ),
-                                                    child: rowCells(context, [
-                                                      item.label,
-                                                      item.part,
-                                                      item.description,
-                                                      numberText(
-                                                        item.bomQuantity,
-                                                      ),
-                                                      numberText(
-                                                        item.smtQuantity,
-                                                      ),
-                                                      item.bomPositions,
-                                                      item.smtPositions,
-                                                      item.reasons
-                                                          .map(
-                                                            (r) => localText(
-                                                              context,
-                                                              r,
-                                                            ),
-                                                          )
-                                                          .join('；'),
-                                                    ], color: color),
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          ),
-                                        ),
+                                                  );
+                                                },
+                                              ),
+                                            ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
                                 ),
-                                const SizedBox(height: 12),
-                              ],
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                   ),
-                  if (showDetail && widget.selected != null) ...[
+                  if (showDetail && detailsOpen && widget.selected != null) ...[
                     const SizedBox(width: 14),
                     SizedBox(
-                      width: 340,
+                      width: 360,
                       child: Pane(
                         padding: EdgeInsets.zero,
-                        child: ItemDetail(
-                          item: widget.selected!,
-                          onAi: widget.onAi,
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 18,
+                                right: 6,
+                              ),
+                              child: Row(
+                                children: [
+                                  const Expanded(
+                                    child: LText(
+                                      '来源与差异详情',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                  IconButton(
+                                    tooltip: localText(context, '收起详情'),
+                                    icon: const Icon(Icons.close, size: 17),
+                                    onPressed: () =>
+                                        setState(() => detailsOpen = false),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            Expanded(
+                              child: ItemDetail(
+                                item: widget.selected!,
+                                onAi: widget.onAi,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -278,8 +352,9 @@ class _ResultsViewState extends State<ResultsView> {
     List<String> values, {
     bool header = false,
     Color? color,
+    required double width,
   }) {
-    const widths = [78.0, 180.0, 230.0, 85.0, 85.0, 220.0, 220.0, 420.0];
+    final widths = [96.0, 180.0, 220.0, 80.0, 80.0, 210.0, 210.0, width - 1082];
     return Row(
       children: [
         for (var i = 0; i < values.length; i++)

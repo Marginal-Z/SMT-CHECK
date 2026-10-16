@@ -56,6 +56,7 @@ class XlsxReader {
             .toList() ??
         <String>[];
     final rows = <MaterialRow>[], notes = <String>[], mappings = <String>[];
+    final sourceSheets = <SourceSheet>[];
     final filename = path.replaceAll('\\', '/').split('/').last;
     for (final sheet in workbook.findAllElements('sheet')) {
       final name = sheet.getAttribute('name') ?? 'Sheet';
@@ -76,17 +77,20 @@ class XlsxReader {
         throw FormatException('$name：缺少工作表数据，无法完成完整核对');
       }
       Map<String, String>? mapping;
+      final sourceRows = <SourceRow>[];
       var header = 0, imported = 0;
       for (final row in data.findAllElements('row')) {
         final rowNum = int.tryParse(row.getAttribute('r') ?? '') ?? 0;
         final cells = <String, String>{},
             uncached = <String>{},
             formulas = <String>{};
+        final rawFormulas = <String, String>{};
         for (final c in row.findElements('c')) {
           final col = (c.getAttribute('r') ?? '').replaceAll(RegExp(r'\d'), '');
           final type = c.getAttribute('t');
           final v = c.getElement('v')?.innerText ?? '';
           if (c.getElement('f') != null) {
+            rawFormulas[col] = c.getElement('f')!.innerText;
             formulas.add(col);
             if (v.isEmpty) {
               uncached.add(col);
@@ -105,6 +109,7 @@ class XlsxReader {
         if (cells.values.every((v) => v.trim().isEmpty) && uncached.isEmpty) {
           continue;
         }
+        sourceRows.add(SourceRow(rowNum, cells, formulas: rawFormulas));
         final detected = <String, String>{};
         for (final field in aliases[kind]!.entries) {
           for (final cell in cells.entries) {
@@ -183,12 +188,26 @@ class XlsxReader {
       } else {
         notes.add('$name：导入 $imported 行，含候选替代料行');
       }
+      sourceSheets.add(
+        SourceSheet(
+          name,
+          sourceRows,
+          visibility: sheet.getAttribute('state') ?? 'visible',
+        ),
+      );
     }
     if (mappings.isEmpty || rows.isEmpty) {
       throw FormatException(
         '未找到有效${kind == InputKind.bom ? 'T100-BOM' : 'SMT站位表'}数据。必需字段：${aliases[kind]!.values.map((v) => v.first).join('、')}',
       );
     }
-    return ImportedFile(path, kind, rows, notes, mappings);
+    return ImportedFile(
+      path,
+      kind,
+      rows,
+      notes,
+      mappings,
+      sheets: sourceSheets,
+    );
   }
 }

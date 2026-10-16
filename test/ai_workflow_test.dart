@@ -1,0 +1,192 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:smt_check/app.dart';
+import 'package:smt_check/core/models.dart';
+import 'package:smt_check/services/ai_service.dart';
+import 'package:smt_check/services/source_analysis.dart';
+
+import 'checker_test.dart' as f;
+
+class _Files extends FileSelectorPlatform {
+  @override
+  Future<XFile?> openFile({
+    List<XTypeGroup>? acceptedTypeGroups,
+    String? initialDirectory,
+    String? confirmButtonText,
+  }) async => XFile('source.xlsx');
+}
+
+http.Response reply(String text) => http.Response.bytes(
+  utf8.encode(
+    jsonEncode({
+      'choices': [
+        {
+          'message': {'content': text},
+        },
+      ],
+    }),
+  ),
+  200,
+);
+
+Future<void> prepare(
+  WidgetTester tester,
+  Future<http.Response> Function(http.Request) handler, {
+  SourceAnalysisPlan? plan,
+}) async {
+  tester.view.physicalSize = const Size(1560, 980);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  final original = FileSelectorPlatform.instance;
+  FileSelectorPlatform.instance = _Files();
+  addTearDown(() => FileSelectorPlatform.instance = original);
+  SharedPreferences.setMockInitialValues({
+    'aiUrl': 'http://localhost/v1',
+    'aiModel': 'demo',
+  });
+  await tester.pumpWidget(
+    SmtCheckApp(
+      workbookLoader: (_, kind, side) async => f.input(
+        [f.row('K1', '1', kind == InputKind.bom ? 'R1' : 'R2')],
+        bom: kind == InputKind.bom,
+        path: kind == InputKind.bom ? 'bom.xlsx' : 'station.xlsx',
+      ),
+      aiServiceFactory: () => AiService(client: MockClient(handler)),
+      sourcePlanner: (bom, stations, rules, limit) async =>
+          plan ?? prepareSourceAnalysis(bom, stations, rules, limit),
+    ),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('单站位表'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('导入 BOM'));
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('导入站位表'));
+  await tester.pumpAndSettle();
+  expect(find.text('导出 CSV'), findsNothing);
+  await tester.tap(find.byTooltip('AI 分析核对'));
+  await tester.pumpAndSettle();
+  expect(find.byKey(const Key('ai-url')), findsNothing);
+}
+
+Future<void> startSource(WidgetTester tester) async {
+  await tester.tap(find.text('分析原始文件'));
+  await tester.pumpAndSettle();
+  expect(find.text('发送原始文件内容至 AI'), findsOneWidget);
+  await tester.tap(find.text('发送并分析'));
+  await tester.pump();
+}
+
+const twoBatches = SourceAnalysisPlan(
+  [
+    SourceAnalysisBatch('parts', '{"parts":[{"part":"A","records":[]}]}', 1),
+    SourceAnalysisBatch('worksheet_context', '{"rows":[]}', 0),
+  ],
+  2,
+  2,
+  2,
+);
+
+void main() {
+  testWidgets(
+    'original AI runs without a local report and connection settings remain separate',
+    (tester) async {
+      var sourceRequests = 0;
+      await prepare(tester, (request) async {
+        final data = jsonDecode(request.body);
+        if (data['messages'][1]['content'].contains('sourceData')) {
+          sourceRequests++;
+          expect(
+            jsonDecode(
+              data['messages'][1]['content'],
+            )['sourceData']['parts'][0]['records'],
+            hasLength(2),
+          );
+          return reply('SOURCE REVIEW');
+        }
+        return reply('CONNECTED');
+      });
+      await startSource(tester);
+      await tester.pumpAndSettle();
+      expect(sourceRequests, 1);
+      expect(find.textContaining('SOURCE REVIEW'), findsOneWidget);
+      expect(find.textContaining('全部 1 批分析完成'), findsOneWidget);
+      await tester.tap(find.byTooltip('设置'));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('ai-url')), findsOneWidget);
+      await tester.enterText(find.byKey(const Key('ai-key')), 'session-secret');
+      await tester.tap(find.text('保存设置'));
+      await tester.pumpAndSettle();
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('aiModel'), 'demo');
+      expect(prefs.getInt('aiBatchLimit'), 48000);
+      expect(
+        prefs.getKeys().any((k) => k.toLowerCase().contains('key')),
+        isFalse,
+      );
+      await tester.tap(find.text('测试连接'));
+      await tester.pumpAndSettle();
+      expect(find.text('CONNECTED'), findsOneWidget);
+      await tester.tap(find.byTooltip('AI 分析核对'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('SOURCE REVIEW'), findsOneWidget);
+      expect(find.text('CONNECTED'), findsNothing);
+      await tester.tap(find.byTooltip('核对工作台'));
+      await tester.pumpAndSettle();
+      expect(find.text('导出 CSV'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('cancel retains completed batches and ignores a late response', (
+    tester,
+  ) async {
+    final pending = Completer<http.Response>();
+    var calls = 0;
+    await prepare(
+      tester,
+      (_) async => ++calls == 1 ? reply('COMPLETED FIRST') : pending.future,
+      plan: twoBatches,
+    );
+    await startSource(tester);
+    for (var i = 0; i < 8 && calls < 2; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(calls, 2);
+    await tester.tap(find.text('取消分析'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('COMPLETED FIRST'), findsOneWidget);
+    expect(find.textContaining('已完成 1 / 2 批，结果不完整'), findsOneWidget);
+    pending.complete(reply('LATE RESPONSE'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('LATE RESPONSE'), findsNothing);
+    expect(find.textContaining('全部 2 批分析完成'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+    'batch failure preserves prior evidence and never claims complete coverage',
+    (tester) async {
+      var calls = 0;
+      await prepare(
+        tester,
+        (_) async => ++calls == 1
+            ? reply('FIRST EVIDENCE')
+            : http.Response('overloaded', 503),
+        plan: twoBatches,
+      );
+      await startSource(tester);
+      await tester.pumpAndSettle();
+      expect(find.textContaining('FIRST EVIDENCE'), findsOneWidget);
+      expect(find.textContaining('原始文件分析中断，已完成 1 / 2 批'), findsOneWidget);
+      expect(find.textContaining('全部 2 批分析完成'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+}

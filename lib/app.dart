@@ -12,9 +12,12 @@ import 'core/models.dart';
 import 'services/background_tasks.dart';
 import 'services/ai_service.dart';
 import 'services/report_export.dart';
+import 'services/source_analysis.dart';
 import 'ui/design.dart';
 import 'ui/results.dart';
 import 'ui/localized_text.dart';
+import 'ui/desktop_shell.dart';
+import 'ui/ai_views.dart';
 import 'l10n/localization.dart';
 
 class SmtCheckApp extends StatefulWidget {
@@ -24,6 +27,14 @@ class SmtCheckApp extends StatefulWidget {
   final String initialLanguage;
   final Future<ImportedFile> Function(String, InputKind, String)?
   workbookLoader;
+  final AiService Function()? aiServiceFactory;
+  final Future<SourceAnalysisPlan> Function(
+    ImportedFile,
+    List<ImportedFile>,
+    CheckRules,
+    int,
+  )?
+  sourcePlanner;
   const SmtCheckApp({
     super.key,
     this.arguments = const [],
@@ -31,6 +42,8 @@ class SmtCheckApp extends StatefulWidget {
     this.initialReport,
     this.initialLanguage = 'zh',
     this.workbookLoader,
+    this.aiServiceFactory,
+    this.sourcePlanner,
   });
   @override
   State<SmtCheckApp> createState() => _SmtCheckAppState();
@@ -54,6 +67,9 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       settingsLoaded = false;
   int page = 0;
   int sessionEpoch = 0;
+  int aiEpoch = 0, batchLimit = 48000, sourceCompleted = 0, sourceTotal = 0;
+  bool aiSourceMode = true;
+  String sourceAiText = '', connectionText = '';
   late String language;
   String aiText = '', activity = '就绪 · 文件在本机核对', error = '';
   SharedPreferences? prefs;
@@ -90,6 +106,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         keywordController.text = rules.keywords.join('\n');
         url.text = prefs!.getString('aiUrl') ?? '';
         model.text = prefs!.getString('aiModel') ?? '';
+        final savedLimit = prefs!.getInt('aiBatchLimit');
+        if ([12000, 24000, 48000, 96000, 120000].contains(savedLimit)) {
+          batchLimit = savedLimit!;
+        }
       } catch (_) {
         activity = '设置存储不可用 · 当前会话仍可核对';
       }
@@ -135,9 +155,13 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   void invalidate() {
+    stopAi();
     report = null;
     selected = null;
     aiText = '';
+    sourceAiText = '';
+    sourceCompleted = 0;
+    sourceTotal = 0;
     error = '';
   }
 
@@ -227,7 +251,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   Future<void> runCheck() async {
-    if (busy) return;
+    if (busy || aiBusy) return;
     final epoch = sessionEpoch;
     if (bom == null || a == null || (merged && b == null)) {
       notify(merged ? '请先导入 BOM、站位表 A 和 B' : '请先导入 BOM 和一份站位表');
@@ -293,58 +317,79 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       ).endpoint;
       await prefs?.setString('aiUrl', url.text.trim());
       await prefs?.setString('aiModel', model.text.trim());
+      await prefs?.setInt('aiBatchLimit', batchLimit);
       notify('接口和模型已保存，密钥仅在当前会话使用');
     } catch (e) {
       notify('保存失败：$e');
     }
   }
 
-  Future<void> askAi({bool test = false, CheckItem? item}) async {
-    final epoch = sessionEpoch;
-    if (!test && report == null) {
-      notify('请先完成一次核对');
-      return;
+  bool get sourcesReady => bom != null && a != null && (!merged || b != null);
+  List<ImportedFile> get sourceFiles => [?bom, ?a, if (merged && b != null) b!];
+  AiConfig get aiConfig =>
+      AiConfig(baseUrl: url.text, model: model.text, apiKey: apiKey.text);
+
+  void stopAi({bool cancelled = false}) {
+    aiEpoch++;
+    activeAi?.close();
+    activeAi = null;
+    aiBusy = false;
+    if (cancelled) {
+      if (aiSourceMode) {
+        sourceAiText +=
+            '\n\n${translate('分析已取消，已完成 $sourceCompleted / $sourceTotal 批，结果不完整。', language)}';
+      } else {
+        aiText += '\n${translate('分析已取消', language)}';
+      }
+      activity = '分析已取消';
     }
-    final config = AiConfig(
-      baseUrl: url.text,
-      model: model.text,
-      apiKey: apiKey.text,
-    );
+  }
+
+  String safeAiError(Object error, AiConfig config) =>
+      config.apiKey.trim().isEmpty
+      ? error.toString()
+      : error.toString().replaceAll(config.apiKey.trim(), '[已隐藏]');
+
+  bool validateAi(AiConfig config) {
     try {
       config.endpoint;
+      return true;
     } catch (e) {
-      setState(() => page = 2);
+      setState(() => page = 3);
       notify(e.toString());
-      return;
+      return false;
     }
-    if (aiBusy) return;
-    final currentReport = report;
-    setState(() => page = 2);
-    if (!test) {
-      final proceed = await showDialog<bool>(
+  }
+
+  Future<bool> confirmAi(AiConfig config, String title, String scope) async =>
+      await showDialog<bool>(
         context: navigator.currentState!.overlay!.context,
         builder: (context) => Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-          child: SizedBox(
-            width: 480,
-            child: Padding(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 540),
+            child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const LText(
-                    '发送异常数据至 AI',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                  LText(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 14),
-                  LText(
-                    '接收地址：${config.endpoint.host}\n将发送${item == null ? '最多前 40 项异常' : '当前料号 ${item.part}'}的料号、描述、数量、位号及来源行号。原始 Excel 文件不会上传。',
-                    style: const TextStyle(height: 1.7),
+                  SelectableText(
+                    '${localText(context, '接收地址')}：${config.endpoint.host}\n\n$scope',
+                    style: const TextStyle(fontSize: 13, height: 1.7),
                   ),
                   const SizedBox(height: 20),
                   Wrap(
                     spacing: 10,
+                    runSpacing: 8,
                     children: [
                       DeskButton(
                         '发送并分析',
@@ -362,37 +407,171 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             ),
           ),
         ),
-      );
-      if (proceed != true || !mounted || epoch != sessionEpoch) return;
+      ) ??
+      false;
+
+  Future<void> askAi({bool test = false, CheckItem? item}) async {
+    if (aiBusy) return;
+    if (!test && report == null) {
+      notify('请先完成一次核对');
+      return;
     }
+    final config = aiConfig;
+    if (!validateAi(config)) return;
+    final epoch = ++aiEpoch, currentReport = report, requestLanguage = language;
+    AiService? service;
     setState(() {
       aiBusy = true;
-      aiText = test ? '正在测试连接…' : '正在分析异常…';
+      page = test ? 3 : 2;
+      if (test) {
+        connectionText = translate('正在测试连接…', language);
+      } else {
+        aiSourceMode = false;
+      }
     });
-    final service = AiService();
-    activeAi = service;
     try {
+      if (!test) {
+        final scope = translate(
+          '接收地址：${config.endpoint.host}\n将发送${item == null ? '最多前 40 项异常' : '当前料号 ${item.part}'}的料号、描述、数量、位号及来源行号。原始 Excel 文件不会上传。',
+          requestLanguage,
+        );
+        if (!await confirmAi(config, '发送异常数据至 AI', scope) ||
+            !mounted ||
+            epoch != aiEpoch) {
+          return;
+        }
+        setState(() => aiText = translate('正在分析异常…', requestLanguage));
+      }
+      service = (widget.aiServiceFactory ?? AiService.new)();
+      activeAi = service;
       final text = await service.complete(
         config,
         report: test ? null : currentReport,
         item: item,
-        language: language,
+        language: requestLanguage,
       );
       if (mounted &&
-          epoch == sessionEpoch &&
+          epoch == aiEpoch &&
           (test || identical(report, currentReport))) {
-        setState(() => aiText = text);
+        setState(() {
+          if (test) {
+            connectionText = text;
+          } else {
+            aiText = text;
+          }
+        });
       }
     } catch (e) {
-      if (mounted &&
-          epoch == sessionEpoch &&
-          (test || identical(report, currentReport))) {
-        setState(() => aiText = '调用失败：$e\n请核对接口地址、模型、密钥与网络；规则核对结果仍然保留。');
+      if (mounted && epoch == aiEpoch) {
+        setState(() {
+          final text = translate(
+            '调用失败：${safeAiError(e, config)}\n请核对接口地址、模型、密钥与网络；规则核对结果仍然保留。',
+            requestLanguage,
+          );
+          if (test) {
+            connectionText = text;
+          } else {
+            aiText = text;
+          }
+        });
       }
     } finally {
-      service.close();
+      service?.close();
       if (identical(activeAi, service)) activeAi = null;
-      if (mounted && epoch == sessionEpoch) setState(() => aiBusy = false);
+      if (mounted && epoch == aiEpoch) setState(() => aiBusy = false);
+    }
+  }
+
+  Future<void> analyzeSources() async {
+    if (busy || aiBusy) return;
+    if (!sourcesReady) {
+      notify(merged ? '请先导入 BOM、站位表 A 和 B' : '请先导入 BOM 和一份站位表');
+      return;
+    }
+    final config = aiConfig;
+    if (!validateAi(config)) return;
+    final epoch = ++aiEpoch, requestLanguage = language;
+    final inputBom = bom!,
+        stations = [a!, if (merged) b!],
+        inputRules = rules,
+        limit = batchLimit;
+    AiService? service;
+    setState(() {
+      page = 2;
+      aiSourceMode = true;
+      aiBusy = true;
+      sourceCompleted = 0;
+      sourceTotal = 0;
+      sourceAiText = '';
+      activity = '正在准备原始文件分析…';
+    });
+    try {
+      final plan =
+          await (widget.sourcePlanner ?? prepareSourceAnalysisInBackground)(
+            inputBom,
+            stations,
+            inputRules,
+            limit,
+          );
+      if (!mounted || epoch != aiEpoch) return;
+      setState(() => sourceTotal = plan.batches.length);
+      final scope = translate(
+        '将发送 ${plan.fileCount} 份文件中 ${plan.materialRows} 条物料记录及全部已读取的原始单元格、表头和公式文本，共 ${plan.batches.length} 批。包括排除料、候选料和额外工作表内容；不上传 Excel 二进制文件。',
+        requestLanguage,
+      );
+      final confirmed = await confirmAi(
+        config,
+        '发送原始文件内容至 AI',
+        '$scope\n\n${[inputBom, ...stations].map((f) => f.name).join('\n')}',
+      );
+      if (!mounted || epoch != aiEpoch) return;
+      if (!confirmed) {
+        setState(() {
+          sourceTotal = 0;
+          activity = '已取消发送';
+        });
+        return;
+      }
+      service = (widget.aiServiceFactory ?? AiService.new)();
+      activeAi = service;
+      for (var index = 0; index < plan.batches.length; index++) {
+        final batch = plan.batches[index];
+        final text = await service.analyzeSourceBatch(
+          config,
+          batch,
+          language: requestLanguage,
+        );
+        if (!mounted || epoch != aiEpoch) return;
+        final scopeLabel = switch (batch.kind) {
+          'parts' => '物料字段核对',
+          'worksheet_context' => '工作表原文审阅',
+          _ => '位号归属复核',
+        };
+        setState(() {
+          sourceCompleted = index + 1;
+          sourceAiText +=
+              '${sourceAiText.isEmpty ? '' : '\n\n'}${translate('第 ${index + 1} / ${plan.batches.length} 批', requestLanguage)} · ${translate(scopeLabel, requestLanguage)}\n$text';
+        });
+      }
+      if (mounted && epoch == aiEpoch) {
+        setState(() {
+          sourceAiText +=
+              '\n\n${translate('全部 $sourceTotal 批分析完成。AI 结论供复核，不改变本地核对状态。', requestLanguage)}';
+          activity = '原始文件 AI 核对完成';
+        });
+      }
+    } catch (e) {
+      if (mounted && epoch == aiEpoch) {
+        setState(() {
+          sourceAiText +=
+              '\n\n${translate('原始文件分析中断，已完成 $sourceCompleted / $sourceTotal 批，结果不完整：${safeAiError(e, config)}', requestLanguage)}';
+          activity = '原始文件 AI 分析失败';
+        });
+      }
+    } finally {
+      service?.close();
+      if (identical(activeAi, service)) activeAi = null;
+      if (mounted && epoch == aiEpoch) setState(() => aiBusy = false);
     }
   }
 
@@ -453,157 +632,25 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               clearSession,
         },
         child: Scaffold(
-          body: LayoutBuilder(
-            builder: (context, constraints) {
-              final compact = constraints.maxWidth < 1000,
-                  p = Palette.of(context);
-              return Row(
-                children: [
-                  sidebar(context, compact),
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Container(
-                          height: 68,
-                          padding: const EdgeInsets.symmetric(horizontal: 22),
-                          decoration: BoxDecoration(
-                            color: p.panel,
-                            border: Border(bottom: BorderSide(color: p.line)),
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    LText(
-                                      [
-                                        '核对工作台',
-                                        '导入与规则',
-                                        'AI 异常分析',
-                                        '使用说明',
-                                      ][page],
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    if (constraints.maxWidth > 650)
-                                      caption(
-                                        context,
-                                        'T100 BOM  /  SMT 站位表  ·  双向核对',
-                                      ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                key: const Key('language-selector'),
-                                height: 35,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                ),
-                                margin: const EdgeInsets.only(right: 8),
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: p.line),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: DropdownButtonHideUnderline(
-                                  child: DropdownButton<String>(
-                                    value: language,
-                                    icon: const Icon(Icons.language, size: 16),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: p.text,
-                                      fontFamilyFallback: const [
-                                        'Noto Sans Thai',
-                                      ],
-                                    ),
-                                    items: [
-                                      for (final code in supportedLanguages)
-                                        DropdownMenuItem(
-                                          value: code,
-                                          child: Text(languageNames[code]!),
-                                        ),
-                                    ],
-                                    onChanged: (value) {
-                                      if (value != null) {
-                                        unawaited(changeLanguage(value));
-                                      }
-                                    },
-                                  ),
-                                ),
-                              ),
-                              Tooltip(
-                                message: localText(
-                                  context,
-                                  dark ? '切换浅色主题' : '切换深色主题',
-                                ),
-                                child: DeskButton(
-                                  dark ? '浅色' : '深色',
-                                  icon: dark
-                                      ? Icons.light_mode_outlined
-                                      : Icons.dark_mode_outlined,
-                                  onPressed: () {
-                                    setState(() => dark = !dark);
-                                    unawaited(prefs?.setBool('dark', dark));
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.all(
-                              constraints.maxWidth < 700 ? 12 : 22,
-                            ),
-                            child: page == 0
-                                ? workspace(context)
-                                : page == 1
-                                ? rulesPage(context)
-                                : page == 2
-                                ? aiPage(context)
-                                : helpPage(context),
-                          ),
-                        ),
-                        Container(
-                          height: 29,
-                          color: p.panel,
-                          padding: const EdgeInsets.symmetric(horizontal: 18),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 5,
-                                height: 5,
-                                color: error.isNotEmpty ? bad : good,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: LText(
-                                  busy ? '正在处理…' : activity,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: p.muted,
-                                  ),
-                                ),
-                              ),
-                              const LText(
-                                'SMT-CHECK  1.2',
-                                style: TextStyle(fontSize: 10),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              );
+          body: DesktopShell(
+            page: page,
+            language: language,
+            activity: activity,
+            dark: dark,
+            busy: busy || aiBusy,
+            hasError: error.isNotEmpty,
+            onPage: (value) => setState(() => page = value),
+            onLanguage: (value) => unawaited(changeLanguage(value)),
+            onTheme: () {
+              setState(() => dark = !dark);
+              unawaited(prefs?.setBool('dark', dark));
+            },
+            child: switch (page) {
+              0 => workspace(context),
+              1 => rulesPage(context),
+              2 => aiPage(context),
+              3 => settingsPage(context),
+              _ => helpPage(context),
             },
           ),
         ),
@@ -611,252 +658,93 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     ),
   );
 
-  Widget sidebar(BuildContext context, bool compact) {
-    final labels = ['核对工作台', '导入与规则', 'AI 异常分析', '使用说明'];
-    const icons = [
-      Icons.fact_check_outlined,
-      Icons.tune_outlined,
-      Icons.auto_awesome_outlined,
-      Icons.help_outline,
-    ];
-    return Container(
-      width: compact ? 64 : 190,
-      color: const Color(0xFF151515),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: compact ? 14 : 20,
-              vertical: 24,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const LText(
-                    'SC',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-                if (!compact) ...[
-                  const SizedBox(width: 10),
-                  const Expanded(
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: LText(
-                        'SMT-CHECK',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (!compact)
-            const Padding(
-              padding: EdgeInsets.fromLTRB(22, 12, 0, 14),
-              child: LText(
-                '生产工程  /  QUALITY',
-                style: TextStyle(fontSize: 10, color: Color(0xFF888888)),
-              ),
-            ),
-          for (var i = 0; i < labels.length; i++)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-              child: Tooltip(
-                message: localText(context, labels[i]),
-                child: Semantics(
-                  button: true,
-                  selected: page == i,
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      foregroundColor: page == i
-                          ? Colors.white
-                          : const Color(0xFFAAAAAA),
-                      backgroundColor: page == i
-                          ? const Color(0xFF303030)
-                          : Colors.transparent,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 15,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    onPressed: () => setState(() => page = i),
-                    child: Row(
-                      mainAxisAlignment: compact
-                          ? MainAxisAlignment.center
-                          : MainAxisAlignment.start,
-                      children: [
-                        Icon(icons[i], size: 19),
-                        if (!compact) ...[
-                          const SizedBox(width: 11),
-                          Expanded(
-                            child: LText(
-                              labels[i],
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          const Spacer(),
-          if (!compact)
-            const Padding(
-              padding: EdgeInsets.all(22),
-              child: LText(
-                '本地核对引擎\n原文件只读 · 来源可追溯',
-                style: TextStyle(
-                  color: Color(0xFF888888),
-                  fontSize: 10,
-                  height: 1.8,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget importBar(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          DeskButton(
-            '单站位表',
-            selected: !merged,
-            onPressed: busy
-                ? null
-                : () {
-                    setState(() {
-                      merged = false;
-                      invalidate();
-                    });
-                  },
-          ),
-          DeskButton(
-            'A + B 合并',
-            selected: merged,
-            onPressed: busy
-                ? null
-                : () {
-                    setState(() {
-                      merged = true;
-                      invalidate();
-                    });
-                  },
-          ),
-          const SizedBox(width: 5),
-          DeskButton(
-            '导入 BOM',
-            icon: Icons.upload_file_outlined,
-            onPressed: busy ? null : () => pick(0),
-          ),
-          DeskButton(
-            merged ? '导入站位 A' : '导入站位表',
-            icon: Icons.upload_file_outlined,
-            onPressed: busy ? null : () => pick(1),
-          ),
-          if (merged)
-            DeskButton(
-              '导入站位 B',
-              icon: Icons.upload_file_outlined,
-              onPressed: busy ? null : () => pick(2),
-            ),
-          DeskButton(
-            busy ? '处理中…' : '开始核对',
-            icon: Icons.play_arrow,
-            primary: true,
-            onPressed: busy || !settingsLoaded ? null : runCheck,
-          ),
-          DeskButton(
-            '清空重来',
-            key: const Key('clear-session'),
-            icon: Icons.restart_alt,
-            onPressed: clearSession,
-          ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 16,
-        runSpacing: 5,
-        children: [
-          for (final (label, f) in [
-            ('BOM', bom),
-            ('A', a),
-            if (merged) ('B', b),
-          ])
-            Tooltip(
-              message: f?.path ?? localText(context, '尚未选择文件'),
-              child: LText(
-                '$label  ${f == null ? localText(context, '待导入') : '${f.name.length > 29 ? '${f.name.substring(0, 26)}…' : f.name}  · ${localText(context, '${f.rows.length}行')}'}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: f == null
-                      ? Palette.of(context).muted
-                      : Palette.of(context).text,
-                ),
-              ),
-            ),
-        ],
-      ),
-      if (!merged)
-        Padding(
-          padding: const EdgeInsets.only(top: 9),
-          child: caption(context, '单表模式对完整 BOM 核对；未覆盖另一面的料号仍列为异常。'),
-        ),
-      if (error.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.only(top: 9),
-          child: SelectableText(
-            localText(context, error),
-            style: const TextStyle(color: bad, fontSize: 12),
-          ),
-        ),
-    ],
-  );
   Widget workspace(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => Column(
+    builder: (context, c) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: (constraints.maxHeight - 300).clamp(
-              0.0,
-              constraints.maxHeight,
+            maxHeight: (c.maxHeight - 300).clamp(0.0, c.maxHeight),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    DeskButton(
+                      '单站位表',
+                      selected: !merged,
+                      onPressed: busy || aiBusy
+                          ? null
+                          : () => setState(() {
+                              merged = false;
+                              invalidate();
+                            }),
+                    ),
+                    DeskButton(
+                      'A + B 合并',
+                      selected: merged,
+                      onPressed: busy || aiBusy
+                          ? null
+                          : () => setState(() {
+                              merged = true;
+                              invalidate();
+                            }),
+                    ),
+                    DeskButton(
+                      busy ? '处理中…' : '开始核对',
+                      primary: true,
+                      icon: Icons.play_arrow,
+                      onPressed: busy || aiBusy || !settingsLoaded
+                          ? null
+                          : runCheck,
+                    ),
+                    DeskButton(
+                      '原始文件 AI 核对',
+                      icon: Icons.auto_awesome_outlined,
+                      onPressed: busy || aiBusy ? null : analyzeSources,
+                    ),
+                    DeskButton(
+                      '清空重来',
+                      key: const Key('clear-session'),
+                      icon: Icons.restart_alt,
+                      onPressed: clearSession,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                FileStrip(
+                  bom: bom,
+                  a: a,
+                  b: b,
+                  merged: merged,
+                  enabled: !busy && !aiBusy,
+                  onPick: (slot) => unawaited(pick(slot)),
+                ),
+                if (!merged)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 7),
+                    child: caption(context, '单表模式对完整 BOM 核对；未覆盖另一面的料号仍列为异常。'),
+                  ),
+                if (error.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 7),
+                    child: SelectableText(
+                      localText(context, error),
+                      style: const TextStyle(color: bad, fontSize: 12),
+                    ),
+                  ),
+                if (report != null)
+                  SummaryStrip(report: report!)
+                else
+                  const SizedBox(height: 12),
+              ],
             ),
           ),
-          child: SingleChildScrollView(child: workspaceHeader(context)),
         ),
         Expanded(
           child: report == null
@@ -872,138 +760,41 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       ],
     ),
   );
-  Widget workspaceHeader(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      importBar(context),
-      const SizedBox(height: 18),
-      if (report != null) ...[
-        Row(
-          children: [
-            Expanded(
-              child: stat(
-                context,
-                '料号总数量',
-                report!.totalPartCount.toString(),
-                null,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: stat(
-                context,
-                'BOM料号数量',
-                report!.bomPartCount.toString(),
-                null,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: stat(
-                context,
-                'SMT站位表料号数量',
-                report!.smtPartCount.toString(),
-                null,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        caption(
-          context,
-          '料号数按去重统计，含已排除和候选料；总数为 BOM 与 SMT 并集，A+B 相同料号只计一次，空料号不计。',
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 20,
-          runSpacing: 6,
-          children: [
-            for (final (label, status, color) in [
-              ('一致料号', CheckStatus.pass, good),
-              ('异常料号', CheckStatus.error, bad),
-              ('排除记录', CheckStatus.excluded, Palette.of(context).muted),
-              ('候选料记录', CheckStatus.candidate, Palette.of(context).muted),
-            ])
-              LText(
-                '${localText(context, label)}  ${report!.count(status)}',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: color,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: 12),
-      ],
-    ],
-  );
-  Widget stat(BuildContext context, String label, String value, Color? color) =>
-      Container(
-        key: ValueKey('stat-$label'),
-        child: Pane(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
-            children: [
-              Expanded(
-                child: LText(
-                  label,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Palette.of(context).muted,
-                  ),
-                ),
-              ),
-              LText(
-                value,
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: color,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+
   Widget emptyState(BuildContext context) => Pane(
     child: Center(
       child: SingleChildScrollView(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 610),
+          constraints: const BoxConstraints(maxWidth: 650),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.table_chart_outlined,
-                size: 40,
-                color: Palette.of(context).muted,
-              ),
-              const SizedBox(height: 20),
+              const Icon(Icons.compare_outlined, size: 36),
+              const SizedBox(height: 16),
               const LText(
                 '从原始文件，核对每一项物料',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
               caption(
                 context,
                 '导入 T100-BOM 与一份或两份 SMT 站位表。自动识别表头，按料号汇总，用数量和位号交叉验证。',
               ),
-              const SizedBox(height: 28),
-              for (final line in [
-                '01   导入 BOM：料件编号 / 品名 / 组成用量 / 插件位置',
-                '02   导入 SMT：料号 / 物料描述 / 数量 / 位号',
-                '03   核对双向差异，逐项查看原因和原文件行号',
-              ])
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: LText(line, style: const TextStyle(fontSize: 12)),
-                ),
+              const SizedBox(height: 20),
+              const LText(
+                'BOM  料件编号 · 品名 · 组成用量 · 插件位置',
+                style: TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              const LText(
+                'SMT  料号 · 物料描述 · 数量 · 位号',
+                style: TextStyle(fontSize: 12),
+              ),
               const SizedBox(height: 20),
               DeskButton(
                 '查看排除规则',
-                icon: Icons.tune,
+                icon: Icons.rule_outlined,
                 onPressed: () => setState(() => page = 1),
               ),
             ],
@@ -1012,6 +803,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       ),
     ),
   );
+
   Widget rulesPage(BuildContext context) => SingleChildScrollView(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1032,12 +824,13 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                   DeskButton(
                     rules.excludeEnabled ? '关键词排除：开启' : '关键词排除：关闭',
                     selected: rules.excludeEnabled,
-                    onPressed: () => setState(
-                      () => rules = CheckRules(
+                    onPressed: () => setState(() {
+                      rules = CheckRules(
                         excludeEnabled: !rules.excludeEnabled,
                         keywords: rules.keywords,
-                      ),
-                    ),
+                      );
+                      invalidate();
+                    }),
                   ),
                   DeskButton(
                     '恢复默认关键词',
@@ -1113,127 +906,45 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       ],
     ),
   );
-  Widget aiPage(BuildContext context) => SingleChildScrollView(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Pane(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const LText(
-                '兼容 Chat Completions 的 AI 接口',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              caption(
-                context,
-                '填写服务商或本地模型接口。分析前显示接收地址和发送范围；AI 建议独立显示，不改变核对状态。',
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: url,
-                decoration: InputDecoration(
-                  labelText: localText(context, 'API 基础地址'),
-                  hintText: localText(
-                    context,
-                    'https://服务商地址/v1 或 http://localhost:11434/v1',
-                  ),
-                ),
-                style: const TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: model,
-                decoration: InputDecoration(
-                  labelText: localText(context, '模型名称'),
-                  hintText: localText(context, '填写服务商实际支持的模型'),
-                ),
-                style: const TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 14),
-              TextField(
-                controller: apiKey,
-                obscureText: true,
-                enableSuggestions: false,
-                autocorrect: false,
-                decoration: InputDecoration(
-                  labelText: localText(context, 'API Key（本地无密钥服务可留空）'),
-                ),
-                style: const TextStyle(fontSize: 13),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  caption(context, '密钥仅在当前会话使用，不写入设置文件'),
-                  DeskButton(
-                    '保存设置',
-                    icon: Icons.save_outlined,
-                    onPressed: saveAi,
-                  ),
-                  DeskButton(
-                    '测试连接',
-                    onPressed: aiBusy ? null : () => askAi(test: true),
-                  ),
-                  DeskButton(
-                    aiBusy ? '正在分析…' : '分析异常',
-                    primary: true,
-                    icon: Icons.auto_awesome_outlined,
-                    onPressed: aiBusy || report == null ? null : () => askAi(),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        Pane(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: LText(
-                      'AI 分析结果',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  DeskButton(
-                    '复制',
-                    icon: Icons.copy_outlined,
-                    onPressed: aiText.isEmpty
-                        ? null
-                        : () {
-                            Clipboard.setData(ClipboardData(text: aiText));
-                            notify('分析结果已复制');
-                          },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              SelectableText(
-                localText(
-                  context,
-                  aiText.isEmpty ? '尚未调用 AI。可先测试连接，再分析核对异常。' : aiText,
-                ),
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.8,
-                  color: Palette.of(context).text,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    ),
+  Widget aiPage(BuildContext context) => AiWorkbench(
+    sourceMode: aiSourceMode,
+    busy: aiBusy,
+    canSource: sourcesReady && !busy,
+    canErrors: report != null && !busy,
+    completed: sourceCompleted,
+    total: sourceTotal,
+    files: sourceFiles,
+    result: aiSourceMode ? sourceAiText : aiText,
+    onMode: (value) => setState(() => aiSourceMode = value),
+    onRun: () {
+      if (aiSourceMode) {
+        unawaited(analyzeSources());
+      } else {
+        unawaited(askAi());
+      }
+    },
+    onCancel: () => setState(() => stopAi(cancelled: true)),
+    onSettings: () => setState(() => page = 3),
+    onCopy: () {
+      Clipboard.setData(
+        ClipboardData(text: aiSourceMode ? sourceAiText : aiText),
+      );
+      notify('分析结果已复制');
+    },
   );
+
+  Widget settingsPage(BuildContext context) => AiSettingsPanel(
+    url: url,
+    model: model,
+    apiKey: apiKey,
+    batchLimit: batchLimit,
+    busy: aiBusy,
+    connection: connectionText,
+    onLimit: (value) => setState(() => batchLimit = value),
+    onSave: () => unawaited(saveAi()),
+    onTest: () => unawaited(askAi(test: true)),
+  );
+
   Widget helpPage(BuildContext context) => SingleChildScrollView(
     child: Pane(
       child: Column(
@@ -1268,11 +979,11 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             ),
             (
               '导出与 AI',
-              'CSV 可由 Excel 打开，JSON 保留完整来源和规则。主动点击发送分析后才向所填 AI 接口发送异常数据。没有 AI 密钥也能完成本地核对。',
+              'CSV 可由 Excel 打开，JSON 保留来源和规则。在设置中配置 AI 接口，可选择原始文件核对或本地异常解读。确认发送范围后才发送提取的原文或异常证据；无需 AI 也能完成本地核对。',
             ),
             (
               '快捷键',
-              'Ctrl+O 导入 BOM；Ctrl+Enter 开始核对；Ctrl+E 导出 CSV。表格可横向滚动，点击料号行查看完整证据。',
+              'Ctrl+O 导入 BOM；Ctrl+Enter 开始核对；Ctrl+E 导出 CSV；Ctrl+N 清空重来。表格可横向滚动，点击行查看证据，右侧详情可以收起。',
             ),
           ]) ...[
             LText(

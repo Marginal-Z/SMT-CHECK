@@ -1,5 +1,120 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '已取消发送': ['Sending cancelled', 'ยกเลิกการส่งแล้ว'],
+  '原始文件 AI 分析失败': [
+    'Original file AI analysis failed',
+    'วิเคราะห์ไฟล์ต้นฉบับด้วย AI ไม่สำเร็จ',
+  ],
+  'CSV 可由 Excel 打开，JSON 保留来源和规则。在设置中配置 AI 接口，可选择原始文件核对或本地异常解读。确认发送范围后才发送提取的原文或异常证据；无需 AI 也能完成本地核对。':
+      [
+        'Excel opens CSV reports; JSON keeps sources and rules. Configure AI in Settings, then choose original file checks or local mismatch explanations. Extracted text or mismatch evidence is sent only after confirming its scope. Local checks work without AI.',
+        'เปิดรายงาน CSV ด้วย Excel ได้ ส่วน JSON เก็บแหล่งข้อมูลและกฎ ตั้งค่า AI แล้วเลือกตรวจต้นฉบับหรืออธิบายข้อผิดพลาดในเครื่อง ระบบส่งข้อความหรือหลักฐานหลังยืนยันขอบเขตเท่านั้น ตรวจในเครื่องได้โดยไม่ต้องใช้ AI',
+      ],
+  'Ctrl+O 导入 BOM；Ctrl+Enter 开始核对；Ctrl+E 导出 CSV；Ctrl+N 清空重来。表格可横向滚动，点击行查看证据，右侧详情可以收起。':
+      [
+        'Ctrl+O imports BOM; Ctrl+Enter checks; Ctrl+E exports CSV; Ctrl+N clears the session. Scroll tables horizontally, click rows for evidence and collapse the detail pane when needed.',
+        'Ctrl+O นำเข้า BOM; Ctrl+Enter ตรวจสอบ; Ctrl+E ส่งออก CSV; Ctrl+N ล้างและเริ่มใหม่ เลื่อนตารางแนวนอน คลิกแถวเพื่อดูหลักฐาน และซ่อนรายละเอียดด้านขวาได้',
+      ],
+  'AI 分析核对': ['AI checks', 'ตรวจสอบด้วย AI'],
+  '设置': ['Settings', 'ตั้งค่า'],
+  'AI 接口': ['AI connection', 'การเชื่อมต่อ AI'],
+  'AI 接口设置': ['AI settings', 'ตั้งค่า AI'],
+  '原始文件核对': ['Original files', 'ไฟล์ต้นฉบับ'],
+  '原始文件 AI 核对': ['AI file check', 'ตรวจไฟล์ด้วย AI'],
+  '本地异常解读': ['Explain local mismatches', 'อธิบายข้อผิดพลาดในเครื่อง'],
+  '分析原始文件': ['Analyze original files', 'วิเคราะห์ไฟล์ต้นฉบับ'],
+  '取消分析': ['Cancel analysis', 'ยกเลิกการวิเคราะห์'],
+  '分析已取消': ['Analysis cancelled', 'ยกเลิกการวิเคราะห์แล้ว'],
+  '原始文件 AI 核对结果': ['Original file AI results', 'ผลตรวจไฟล์ต้นฉบับด้วย AI'],
+  '直接读取原始单元格核对，包含排除料、候选料和额外工作表信息；无需先运行本地核对。': [
+    'Check original cells, including excluded materials, alternatives and extra worksheet content. A local check is not required first.',
+    'ตรวจจากเซลล์ต้นฉบับ รวมวัสดุที่ยกเว้น วัสดุทางเลือก และข้อมูลแผ่นงานเพิ่มเติม โดยไม่ต้องตรวจในเครื่องก่อน',
+  ],
+  '依据本地核对结果解释异常；AI 建议不会改变本地核对状态。': [
+    'Explain mismatches from the local check. AI advice does not change local check status.',
+    'อธิบายข้อผิดพลาดจากผลตรวจในเครื่อง คำแนะนำ AI ไม่เปลี่ยนสถานะการตรวจ',
+  ],
+  '请在核对工作台导入原始文件': [
+    'Import original files in the workbench',
+    'นำเข้าไฟล์ต้นฉบับในพื้นที่ตรวจสอบ',
+  ],
+  '已完成 {count} / {total} 批': [
+    'Completed {count} / {total} batches',
+    'เสร็จแล้ว {count} / {total} ชุด',
+  ],
+  '尚未开始分析。配置接口后，选择分析方式并发送。': [
+    'No analysis yet. Configure the AI connection, choose a mode and send.',
+    'ยังไม่ได้วิเคราะห์ ตั้งค่าการเชื่อมต่อ AI เลือกวิธีวิเคราะห์แล้วส่ง',
+  ],
+  'AI 结论仅供复核，原文件和本地核对状态不会被修改。': [
+    'AI conclusions are for review. Source files and local check status stay unchanged.',
+    'ผล AI ใช้ประกอบการทบทวน ไม่แก้ไขต้นฉบับหรือสถานะการตรวจในเครื่อง',
+  ],
+  '原始文件分析分批': ['Original file batches', 'แบ่งชุดวิเคราะห์ไฟล์ต้นฉบับ'],
+  '同料号的 BOM 和 A/B 记录放在同一批，所有批次完成才表示本次分析完整。': [
+    'BOM and A/B records of the same part stay in one batch. All batches must finish for a complete analysis.',
+    'รายการ BOM และ A/B รหัสเดียวกันอยู่ในชุดเดียวกัน ต้องครบทุกชุดจึงถือว่าวิเคราะห์ครบ',
+  ],
+  '单批原文字符上限': [
+    'Source character limit per batch',
+    'จำนวนอักขระต้นฉบับสูงสุดต่อชุด',
+  ],
+  '接收地址': ['Recipient host', 'ปลายทางรับข้อมูล'],
+  '发送原始文件内容至 AI': [
+    'Send original file content to AI',
+    'ส่งเนื้อหาไฟล์ต้นฉบับไปยัง AI',
+  ],
+  '将发送 {files} 份文件中 {rows} 条物料记录及全部已读取的原始单元格、表头和公式文本，共 {total} 批。包括排除料、候选料和额外工作表内容；不上传 Excel 二进制文件。':
+      [
+        'Send {rows} material rows from {files} files and all retained original cells, headers and formula text in {total} batches. Includes excluded materials, alternatives and extra worksheets. Excel binary files are not uploaded.',
+        'ส่งวัสดุ {rows} แถวจาก {files} ไฟล์ พร้อมเซลล์ต้นฉบับ หัวตาราง และข้อความสูตรที่อ่านได้ทั้งหมด รวม {total} ชุด รวมวัสดุที่ยกเว้น วัสดุทางเลือก และแผ่นงานเพิ่มเติม โดยไม่อัปโหลดไฟล์ไบนารี Excel',
+      ],
+  '正在准备原始文件分析…': [
+    'Preparing original file analysis…',
+    'กำลังเตรียมวิเคราะห์ไฟล์ต้นฉบับ…',
+  ],
+  '物料字段核对': ['Material field check', 'ตรวจข้อมูลวัสดุ'],
+  '工作表原文审阅': ['Worksheet content review', 'ทบทวนข้อมูลแผ่นงาน'],
+  '位号归属复核': ['Reference ownership review', 'ทบทวนเจ้าของตำแหน่ง'],
+  '第 {count} / {total} 批': [
+    'Batch {count} / {total}',
+    'ชุดที่ {count} / {total}',
+  ],
+  '全部 {total} 批分析完成。AI 结论供复核，不改变本地核对状态。': [
+    'All {total} batches finished. AI conclusions are for review and do not change local check status.',
+    'วิเคราะห์ครบ {total} ชุดแล้ว ผล AI ใช้ประกอบการทบทวน ไม่เปลี่ยนสถานะการตรวจในเครื่อง',
+  ],
+  '分析已取消，已完成 {count} / {total} 批，结果不完整。': [
+    'Analysis cancelled after {count} / {total} batches. Results are incomplete.',
+    'ยกเลิกหลังเสร็จ {count} / {total} ชุด ผลยังไม่ครบ',
+  ],
+  '原始文件分析中断，已完成 {count} / {total} 批，结果不完整：{reason}': [
+    'Original file analysis stopped after {count} / {total} batches. Results are incomplete: {reason}',
+    'การวิเคราะห์ไฟล์ต้นฉบับหยุดหลังเสร็จ {count} / {total} ชุด ผลยังไม่ครบ: {reason}',
+  ],
+  '原始文件 AI 核对完成': [
+    'Original file AI analysis finished',
+    'ตรวจไฟล์ต้นฉบับด้วย AI เสร็จแล้ว',
+  ],
+  '原始记录超过单批上限：{detail}；请在设置中增大单批字符上限或拆分超长记录。': [
+    'Original record exceeds the batch limit: {detail}. Increase the limit in Settings or split the oversized record.',
+    'ข้อมูลต้นฉบับเกินขีดจำกัดต่อชุด: {detail} เพิ่มขีดจำกัดในตั้งค่าหรือแบ่งข้อมูลที่ยาวเกินไป',
+  ],
+  'AI 单批字符上限须为 12000 至 120000': [
+    'AI batch character limit must be 12000–120000',
+    'ขีดจำกัดอักขระต่อชุด AI ต้องอยู่ระหว่าง 12000–120000',
+  ],
+  '收起详情': ['Hide details', 'ซ่อนรายละเอียด'],
+  '展开详情': ['Show details', 'แสดงรายละเอียด'],
+  '来源与差异详情': ['Sources and differences', 'แหล่งข้อมูลและความแตกต่าง'],
+  'BOM  料件编号 · 品名 · 组成用量 · 插件位置': [
+    'BOM  Part number · Name · Usage · Positions',
+    'BOM  รหัสวัสดุ · ชื่อ · จำนวนใช้ · ตำแหน่ง',
+  ],
+  'SMT  料号 · 物料描述 · 数量 · 位号': [
+    'SMT  Part number · Description · Quantity · References',
+    'SMT  รหัสวัสดุ · รายละเอียด · จำนวน · ตำแหน่ง',
+  ],
   '料号总数量': ['Total unique parts', 'รหัสวัสดุทั้งหมด'],
   'BOM料号数量': ['BOM unique parts', 'รหัสวัสดุ BOM'],
   'SMT站位表料号数量': ['SMT unique parts', 'รหัสวัสดุ SMT'],

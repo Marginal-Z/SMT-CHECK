@@ -83,6 +83,44 @@ void main() {
     expect(report.count(CheckStatus.pass), 2);
     expect(tester.takeException(), isNull);
   });
+  testWidgets(
+    'desktop evidence pane collapses without losing selection or search',
+    (tester) async {
+      tester.view.physicalSize = const Size(1560, 920);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        SmtCheckApp(
+          persist: false,
+          initialReport: fixture.check(
+            [fixture.row('KEEP', '1', 'R1')],
+            [fixture.row('KEEP', '1', 'R2')],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'KEEP');
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byWidgetPredicate((w) => w is Text && w.data == 'KEEP'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('来源与差异详情'), findsOneWidget);
+      await tester.tap(find.byTooltip('收起详情'));
+      await tester.pumpAndSettle();
+      expect(find.text('来源与差异详情'), findsNothing);
+      expect(find.text('KEEP'), findsWidgets);
+      expect(
+        tester.widget<EditableText>(find.byType(EditableText)).controller.text,
+        'KEEP',
+      );
+      await tester.tap(find.text('展开详情'));
+      await tester.pumpAndSettle();
+      expect(find.text('核对原因'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
   for (final language in ['zh', 'en', 'th']) {
     testWidgets(
       'counts, source positions and excluded materials are visible in $language',

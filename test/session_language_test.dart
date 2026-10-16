@@ -20,6 +20,7 @@ class _Selector extends FileSelectorPlatform {
 }
 
 void main() {
+  WidgetController.hitTestWarningShouldBeFatal = true;
   for (final language in ['en', 'th']) {
     for (final width in [560.0, 800.0, 1560.0]) {
       testWidgets('$language fits all screens at $width', (tester) async {
@@ -50,9 +51,16 @@ void main() {
               .pop();
           await tester.pumpAndSettle();
         }
-        for (final title in ['导入与规则', 'AI 异常分析', '使用说明']) {
+        for (final title in ['导入与规则', 'AI 分析核对', '设置', '使用说明']) {
           await tester.tap(find.byTooltip(translate(title, language)));
           await tester.pumpAndSettle();
+          final expected = {
+            '导入与规则': '非贴片物料排除规则',
+            'AI 分析核对': '原始文件核对',
+            '设置': 'API 基础地址',
+            '使用说明': '核对规则与操作',
+          }[title]!;
+          expect(find.text(translate(expected, language)), findsOneWidget);
           expect(tester.takeException(), isNull);
         }
       });
