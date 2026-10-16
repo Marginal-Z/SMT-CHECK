@@ -14,10 +14,13 @@ if (-not $SkipChecks) {
 flutter build windows --release --no-pub
 if ($LASTEXITCODE -ne 0) { throw 'Windows build failed.' }
 $source = Join-Path $taskRoot "build/windows/$Architecture/runner/Release"
-function Assert-PeArchitecture([string]$Path) {
+function Get-PeMachine([string]$Path) {
     $bytes = [IO.File]::ReadAllBytes($Path)
     $offset = [BitConverter]::ToInt32($bytes, 0x3c)
-    $machine = [BitConverter]::ToUInt16($bytes, $offset + 4)
+    return [BitConverter]::ToUInt16($bytes, $offset + 4)
+}
+function Assert-PeArchitecture([string]$Path) {
+    $machine = Get-PeMachine $Path
     $expected = if ($Architecture -eq 'arm64') { 0xaa64 } else { 0x8664 }
     if ($machine -ne $expected) { throw "Wrong PE architecture in $Path : $machine (expected $Architecture)" }
 }
@@ -36,7 +39,18 @@ $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer
 if (Test-Path -LiteralPath $vswhere) {
     $installation = & $vswhere -latest -products '*' -property installationPath
     $redist = Get-ChildItem -Path (Join-Path $installation "VC/Redist/MSVC/*/$Architecture/Microsoft.VC*.CRT") -Directory -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
-    if ($redist) { Get-ChildItem -LiteralPath $redist.FullName -Filter '*.dll' | Copy-Item -Destination $destination -Force }
+    if ($redist) {
+        $expectedMachine = if ($Architecture -eq 'arm64') { 0xaa64 } else { 0x8664 }
+        Get-ChildItem -LiteralPath $redist.FullName -Filter '*.dll' | ForEach-Object {
+            # Microsoft's ARM64 directory also contains an x64 compatibility
+            # vcruntime140_1.dll. The native ARM64 app must not carry that file.
+            if ((Get-PeMachine $_.FullName) -eq $expectedMachine) {
+                Copy-Item -LiteralPath $_.FullName -Destination $destination -Force
+            } else {
+                Write-Host "Skipping non-$Architecture runtime: $($_.Name)"
+            }
+        }
+    }
 }
 if (-not (Test-Path -LiteralPath (Join-Path $destination 'vcruntime140.dll')) -or
     -not (Test-Path -LiteralPath (Join-Path $destination 'msvcp140.dll'))) {
@@ -44,6 +58,20 @@ if (-not (Test-Path -LiteralPath (Join-Path $destination 'vcruntime140.dll')) -o
 }
 Copy-Item -LiteralPath (Join-Path $taskRoot 'README.md') -Destination $destination -Force
 Get-ChildItem -LiteralPath $destination -Filter '*.dll' | ForEach-Object { Assert-PeArchitecture $_.FullName }
+# Check actual imports so preinstalled CI runtimes cannot conceal a missing DLL.
+$dumpbin = Get-ChildItem -Path (Join-Path $installation "VC/Tools/MSVC/*/bin/Host*/$Architecture/dumpbin.exe") -File |
+    Sort-Object FullName -Descending | Select-Object -First 1
+if (-not $dumpbin) { throw 'dumpbin is required to validate packaged runtime dependencies.' }
+foreach ($binary in (Get-ChildItem -LiteralPath $destination -File | Where-Object Extension -In '.exe','.dll')) {
+    $imports = & $dumpbin.FullName /DEPENDENTS $binary.FullName
+    if ($LASTEXITCODE -ne 0) { throw "Cannot inspect imports: $($binary.Name)" }
+    foreach ($line in $imports) {
+        if ($line -match '^\s*((?:msvcp|vcruntime|concrt|vccorlib|vcamp)\w*\.dll)\s*$' -and
+            -not (Test-Path -LiteralPath (Join-Path $destination $Matches[1]))) {
+            throw "Missing runtime dependency $($Matches[1]) for $($binary.Name)"
+        }
+    }
+}
 Copy-Item -LiteralPath (Join-Path $taskRoot 'assets/fonts/OFL-NotoSansThai.txt') -Destination $destination -Force
 $compilerCandidates=@(
     $env:ISCC_PATH,

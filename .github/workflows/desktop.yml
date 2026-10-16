@@ -180,6 +180,7 @@ jobs:
   macos-intel:
     name: macos Intel installation
     needs: desktop
+    if: always() && !cancelled()
     runs-on: macos-15-intel
     timeout-minutes: 10
     steps:
