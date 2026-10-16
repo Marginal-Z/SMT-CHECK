@@ -24,10 +24,10 @@ jobs:
         include:
           - os: windows-2022
             platform: windows
-            package: dist/SMT-CHECK-windows.zip
+            package: dist/SMT-CHECK-Setup-x64.exe
           - os: ubuntu-22.04
             platform: linux
-            package: dist/SMT-CHECK-linux-x64.tar.gz
+            package: dist/SMT-CHECK-linux-amd64.deb
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out source
@@ -58,31 +58,46 @@ jobs:
       - name: Build and package Windows
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./tools/build-windows.ps1 -SkipChecks
+        run: |
+          $compilerRoot = Join-Path $env:RUNNER_TEMP 'InnoSetup'
+          Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_4_3/innosetup-6.4.3.exe' -OutFile "$env:RUNNER_TEMP/innosetup.exe"
+          $setup = Start-Process -FilePath "$env:RUNNER_TEMP/innosetup.exe" -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/CURRENTUSER',"/DIR=$compilerRoot" -Wait -PassThru -WindowStyle Hidden
+          if ($setup.ExitCode -ne 0) { throw "Compiler installation failed: $($setup.ExitCode)" }
+          $env:ISCC_PATH = Join-Path $compilerRoot 'ISCC.exe'
+          ./tools/build-windows.ps1 -SkipChecks
 
-      - name: Check Windows startup
+      - name: Install, launch and uninstall Windows application
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $process = Start-Process -FilePath (Resolve-Path 'dist/SMT-CHECK-windows/SMT-CHECK.exe').Path -WorkingDirectory (Resolve-Path 'dist/SMT-CHECK-windows').Path -PassThru -WindowStyle Hidden
+          $installDir = Join-Path $env:RUNNER_TEMP 'SMT-CHECK-Installed'
+          $installer = Start-Process -FilePath (Resolve-Path 'dist/SMT-CHECK-Setup-x64.exe').Path -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/DIR=$installDir",'/TASKS=' -Wait -PassThru -WindowStyle Hidden
+          if ($installer.ExitCode -ne 0) { throw "Application install failed: $($installer.ExitCode)" }
+          $exe = Join-Path $installDir 'SMT-CHECK.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw 'Installed executable is missing' }
+          $process = Start-Process -FilePath $exe -WorkingDirectory $installDir -PassThru -WindowStyle Hidden
           try {
             Start-Sleep -Seconds 10
             if ($process.HasExited) { throw "Application exited during startup with code $($process.ExitCode)" }
           } finally {
             if (-not $process.HasExited) { Stop-Process -Id $process.Id }
           }
+          $uninstaller = Start-Process -FilePath (Join-Path $installDir 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru -WindowStyle Hidden
+          if ($uninstaller.ExitCode -ne 0 -or (Test-Path -LiteralPath $exe)) { throw 'Application uninstall failed' }
 
       - name: Build and package Linux
         if: runner.os == 'Linux'
         run: bash tools/build-linux.sh --skip-checks
 
-      - name: Check Linux startup
+      - name: Install, launch and uninstall Linux application
         if: runner.os == 'Linux'
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
+          sudo dpkg -i dist/SMT-CHECK-linux-amd64.deb
+          test -f /usr/share/applications/smt-check.desktop
           set +e
-          timeout 15s xvfb-run -a ./dist/SMT-CHECK-linux-x64/SMT-CHECK > linux-startup.log 2>&1
+          timeout 15s xvfb-run -a /usr/bin/smt-check > linux-startup.log 2>&1
           result=$?
           set -e
           cat linux-startup.log
@@ -93,6 +108,8 @@ jobs:
           if grep -E 'Unhandled Exception|ERROR:flutter|Failed to start' linux-startup.log; then
             exit 1
           fi
+          sudo dpkg --remove smt-check
+          test ! -e /opt/smt-check/SMT-CHECK
 
       - name: Upload desktop package
         uses: actions/upload-artifact@v7.0.2

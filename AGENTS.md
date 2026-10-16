@@ -10,3 +10,5 @@
 - 后台任务在独立顶层入口创建隔离任务，避免捕获 Flutter State。
 - 修改解析/核对/布局后，运行 flutter analyze 和相关 flutter test；Windows 交付执行 release 构建。
 - `.tools/`、`outputs/`、`dist/` 和用户参考文件不进入 Git。
+- 中文、英文、泰文文本统一由 lib/l10n 管理，不翻译原始 Excel 字段值。
+- 交付 Windows Setup.exe 和 Linux DEB，验证安装、启动和卸载；正式下载提供 Releases 单文件安装包。

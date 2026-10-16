@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'localized_text.dart';
+
 const good = Color(0xFF16804A), bad = Color(0xFFC53535);
 
 class Palette {
@@ -25,7 +27,12 @@ ThemeData desktopTheme(bool dark) {
     scaffoldBackgroundColor: p.bg,
     canvasColor: p.panel,
     fontFamily: 'Microsoft YaHei',
-    fontFamilyFallback: const ['PingFang SC', 'Noto Sans CJK SC', 'Arial'],
+    fontFamilyFallback: const [
+      'Noto Sans Thai',
+      'PingFang SC',
+      'Noto Sans CJK SC',
+      'Arial',
+    ],
     colorScheme:
         ColorScheme.fromSwatch(
           brightness: dark ? Brightness.dark : Brightness.light,
@@ -95,6 +102,7 @@ class _DeskButtonState extends State<DeskButton> {
   Widget build(BuildContext context) {
     final p = Palette.of(context), w = widget;
     final enabled = w.onPressed != null;
+    final label = localText(context, w.label);
     final fg = !enabled
         ? p.muted
         : w.primary
@@ -103,7 +111,7 @@ class _DeskButtonState extends State<DeskButton> {
     return Semantics(
       button: true,
       enabled: enabled,
-      label: w.label,
+      label: label,
       child: FocusableActionDetector(
         enabled: enabled,
         onShowFocusHighlight: (v) => setState(() => focused = v),
@@ -150,7 +158,7 @@ class _DeskButtonState extends State<DeskButton> {
                     const SizedBox(width: 7),
                   ],
                   Text(
-                    w.label,
+                    label,
                     style: TextStyle(
                       fontSize: 12,
                       color: fg,
@@ -193,6 +201,6 @@ class Pane extends StatelessWidget {
 }
 
 Widget caption(BuildContext context, String text) => Text(
-  text,
+  localText(context, text),
   style: TextStyle(fontSize: 12, color: Palette.of(context).muted, height: 1.6),
 );

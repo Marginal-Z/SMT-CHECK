@@ -17,31 +17,37 @@
 - 导出 CSV（Excel 可打开）和完整 JSON，包含规则和审计记录。
 - 可自行填写 Chat Completions 兼容接口地址、模型和 API Key；支持云端 HTTPS 和 localhost HTTP（例如 Ollama）。密钥仅保存在内存，关闭程序后清除。AI 分析前显示数据发送范围，AI 结果不修改确定性核对状态。
 - Ctrl+O 导入 BOM，Ctrl+Enter 核对，Ctrl+E 导出 CSV。
+- “清空重来”或 Ctrl+N 清除导入文件、结果和 AI 分析，保留语言、主题、规则及接口配置，并使旧异步任务失效。
+- 右上角提供中文、English、ไทย 切换，自动保存选择；界面、异常原因和导出报告支持三语，原始 Excel 内容保持原文。随应用提供 Noto Sans Thai 字体及 OFL 许可。
 
-## 运行 Windows 发行版
+## 安装完整应用
 
-完整解压 `SMT-CHECK-windows.zip`，运行其中的 `SMT-CHECK.exe`。保留同目录的 DLL 和 `data` 文件夹，不能只复制 EXE。软件本地核对不依赖 Excel、Python 或 AI 服务。
+从 [GitHub Releases](https://github.com/Marginal-Z/SMT-CHECK/releases/latest) 直接下载当前版本安装包：
+
+- **Windows x64：`SMT-CHECK-Setup-x64.exe`**。运行安装向导，选择安装目录（可选择 D 盘）；安装完成后从开始菜单启动 SMT-CHECK，可在系统“已安装的应用”中卸载。安装程序自动管理全部运行库和资源，无需解压或手动维护文件。安装向导也提供中、英、泰语言选择。
+- **Ubuntu / Debian x64：`SMT-CHECK-linux-amd64.deb`**。通过系统软件安装器打开，安装后在应用菜单启动 SMT-CHECK。
+
+软件本地核对不依赖 Excel、Python 或 AI 服务。当前 Windows 安装程序尚未进行代码签名。
 
 ## 下载 GitHub 构建
 
-打开 [Windows / Linux 构建列表](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml)，选择最近一次绿色成功的运行，在页面底部 **Artifacts** 下载对应平台包。Artifacts 保留 30 天；手动点击 **Run workflow** 或向 `main` 推送源码可生成新的构建。
+正式下载入口是上面的 Releases，提供直接下载的 EXE / DEB 安装文件。开发构建也会保存在 [Windows / Linux 构建列表](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml) 的 **Artifacts** 中，保留 30 天；手动点击 **Run workflow** 或向 `main` 推送源码可生成新的构建。
 
-- `SMT-CHECK-windows-x64`：包含 Windows ZIP 与 SHA256 校验文件。
-- `SMT-CHECK-linux-x64`：包含 Linux tar.gz 与 SHA256 校验文件，内部保留可执行权限。
+- `SMT-CHECK-windows-x64`：包含 Windows EXE 安装程序与 SHA256 校验文件。
+- `SMT-CHECK-linux-x64`：包含 Linux DEB 安装包与 SHA256 校验文件。
 
-GitHub 下载的 artifact 是外层 ZIP。先解开外层 ZIP，再解开其中的平台包。
+Artifacts 是供开发验证的外层 ZIP；日常安装请直接使用 Releases 的安装文件。
 
 Linux 包在 Ubuntu 22.04 x64 上构建。运行命令在 **WSL Ubuntu / Linux 图形桌面终端** 中执行；WSL 需有 WSLg 图形支持：
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y libgtk-3-0 libstdc++6
-tar -xzf SMT-CHECK-linux-x64.tar.gz
-cd SMT-CHECK-linux-x64
-./SMT-CHECK
+sudo apt install ./SMT-CHECK-linux-amd64.deb
+smt-check
+# 卸载
+sudo apt remove smt-check
 ```
 
-Linux 同样需要保留完整的 `lib`、`data` 目录。其他 Linux 发行版需安装对应 GTK 3、C++ 运行库。
+安装包将应用及资源放入 `/opt/smt-check` 并注册应用菜单，由包管理器管理安装和卸载。当前提供 `.deb`，适用于具备 GTK 3 的 Ubuntu 22.04+ / 兼容 Debian 系统。
 
 ## 开发与构建
 
@@ -61,6 +67,8 @@ flutter run -d windows
 
 Windows 若未开启开发者模式，且 Flutter 提示插件符号链接权限不足，可在首次 `flutter pub get` 生成插件元数据后，以 **PowerShell 7** 执行 `./tools/prepare-plugin-links.ps1`，再重试 `flutter pub get`。该脚本只在本项目内创建指向 Pub 缓存的目录联接，不修改系统设置。
 
+Windows 安装程序使用 Inno Setup 6.4.3 编译。安装 Inno Setup 后，或将 `ISCC_PATH` 指向 `ISCC.exe`，上述脚本会输出 `dist/SMT-CHECK-Setup-x64.exe`。云端工作流会自动准备编译器。
+
 Linux 开发命令在 **WSL Ubuntu / Linux 终端** 中执行，使用 Linux 版 Flutter SDK，不使用挂载盘中的 Windows SDK：
 
 ```bash
@@ -78,12 +86,12 @@ flutter pub get
 flutter build macos --release
 ```
 
-`.github/workflows/desktop.yml` 自动执行 Windows / Linux 的静态检查、测试、release 构建、启动冒烟检查和制品上传。macOS 保留源码运行器，需要在 Mac 上另行构建验证。
+`.github/workflows/desktop.yml` 自动执行 Windows / Linux 的静态检查、测试、release 构建、完整安装、启动及卸载检查和制品上传。macOS 保留源码运行器，需要在 Mac 上另行构建验证。
 
 可在 **PowerShell 7** 通过参数直接导入并核对文件：
 
 ```powershell
-& './dist/SMT-CHECK-windows/SMT-CHECK.exe' --bom 'D:/资料/BOM.xlsx' --a 'D:/资料/站位A.xlsx' --b 'D:/资料/站位B.xlsx'
+& "$env:LOCALAPPDATA/Programs/SMT-CHECK/SMT-CHECK.exe" --bom 'D:/资料/BOM.xlsx' --a 'D:/资料/站位A.xlsx' --b 'D:/资料/站位B.xlsx'
 # 单表省略 --b
 ```
 

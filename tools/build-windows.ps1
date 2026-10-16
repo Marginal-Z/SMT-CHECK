@@ -30,8 +30,21 @@ if (-not (Test-Path -LiteralPath (Join-Path $destination 'vcruntime140.dll')) -o
     throw 'MSVC runtime DLLs are missing from the package.'
 }
 Copy-Item -LiteralPath (Join-Path $taskRoot 'README.md') -Destination $destination -Force
-$archive = Join-Path $taskRoot 'dist/SMT-CHECK-windows.zip'
-Compress-Archive -Path $destination -DestinationPath $archive -Force
+Copy-Item -LiteralPath (Join-Path $taskRoot 'assets/fonts/OFL-NotoSansThai.txt') -Destination $destination -Force
+$compilerCandidates=@(
+    $env:ISCC_PATH,
+    (Join-Path $taskRoot '.tools/innosetup/compiler643/ISCC.exe'),
+    (Join-Path $taskRoot '.tools/innosetup/compiler/ISCC.exe'),
+    (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6/ISCC.exe'),
+    (Join-Path $env:ProgramFiles 'Inno Setup 6/ISCC.exe')
+)
+$compiler=$compilerCandidates | Where-Object {$_ -and (Test-Path -LiteralPath $_)} | Select-Object -First 1
+if(-not $compiler) { throw 'Inno Setup compiler not found. Set ISCC_PATH or install Inno Setup 6.' }
+$versionLine=Get-Content -LiteralPath (Join-Path $taskRoot 'pubspec.yaml') | Where-Object {$_ -match '^version:'} | Select-Object -First 1
+$version=(($versionLine -replace '^version:\s*','') -split '\+')[0].Trim()
+& $compiler "/DAppVersion=$version" (Join-Path $taskRoot 'installer/windows.iss')
+if($LASTEXITCODE -ne 0) { throw 'Installer compilation failed.' }
+$archive = Join-Path $taskRoot 'dist/SMT-CHECK-Setup-x64.exe'
 $checksum = Get-FileHash -LiteralPath $archive -Algorithm SHA256
 "$($checksum.Hash.ToLowerInvariant())  $([IO.Path]::GetFileName($archive))" | Set-Content -LiteralPath "$archive.sha256" -Encoding utf8NoBOM
 Write-Host "Desktop package: $archive"

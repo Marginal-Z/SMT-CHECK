@@ -1,3 +1,5 @@
+import 'localized_text.dart';
+
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
@@ -40,7 +42,7 @@ class _ResultsViewState extends State<ResultsView> {
         .where(
           (i) =>
               (filter == null || filter == i.status) &&
-              '${i.part} ${i.description} ${i.reasons.join(' ')} ${i.bom.map((r) => r.positionsText).join(' ')} ${i.smt.map((r) => r.positionsText).join(' ')}'
+              '${i.part} ${i.description} ${i.reasons.join(' ')} ${i.reasons.map((r) => localText(context, r)).join(' ')} ${i.bom.map((r) => r.positionsText).join(' ')} ${i.smt.map((r) => r.positionsText).join(' ')}'
                   .toLowerCase()
                   .contains(query.toLowerCase()),
         )
@@ -70,8 +72,8 @@ class _ResultsViewState extends State<ResultsView> {
               child: TextField(
                 onChanged: (v) => setState(() => query = v),
                 style: const TextStyle(fontSize: 12),
-                decoration: const InputDecoration(
-                  hintText: '搜索料号、位号或原因',
+                decoration: InputDecoration(
+                  hintText: localText(context, '搜索料号、位号或原因'),
                   prefixIcon: Icon(Icons.search, size: 17),
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: 10,
@@ -130,7 +132,7 @@ class _ResultsViewState extends State<ResultsView> {
                                 Expanded(
                                   child: list.isEmpty
                                       ? const Center(
-                                          child: Text(
+                                          child: LText(
                                             '没有符合筛选条件的记录',
                                             style: TextStyle(fontSize: 12),
                                           ),
@@ -216,7 +218,14 @@ class _ResultsViewState extends State<ResultsView> {
                                                       numberText(
                                                         item.smtQuantity,
                                                       ),
-                                                      item.reasons.join('；'),
+                                                      item.reasons
+                                                          .map(
+                                                            (r) => localText(
+                                                              context,
+                                                              r,
+                                                            ),
+                                                          )
+                                                          .join('；'),
                                                     ], color: color),
                                                   ),
                                                 ),
@@ -285,9 +294,11 @@ class _ResultsViewState extends State<ResultsView> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Tooltip(
-                message: values[i],
+                message: header || i == 0
+                    ? localText(context, values[i])
+                    : values[i],
                 child: Text(
-                  values[i],
+                  header || i == 0 ? localText(context, values[i]) : values[i],
                   maxLines: header ? 1 : 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -327,7 +338,7 @@ class ItemDetail extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          LText(
             item.label,
             style: TextStyle(
               fontSize: 11,
@@ -337,11 +348,11 @@ class ItemDetail extends StatelessWidget {
           ),
           const SizedBox(height: 9),
           SelectableText(
-            item.part.isEmpty ? '空料号' : item.part,
+            item.part.isEmpty ? localText(context, '空料号') : item.part,
             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 18),
-          const Text(
+          const LText(
             '核对原因',
             style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
           ),
@@ -350,7 +361,7 @@ class ItemDetail extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 9),
               child: SelectableText(
-                reason,
+                localText(context, reason),
                 style: TextStyle(fontSize: 12, height: 1.6, color: color),
               ),
             ),
@@ -375,7 +386,7 @@ class ItemDetail extends StatelessWidget {
             ('T100-BOM 原始记录', item.bom),
             ('SMT 站位表原始记录', item.smt),
           ]) ...[
-            Text(
+            LText(
               title,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
             ),
@@ -393,7 +404,7 @@ class ItemDetail extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     SelectableText(
-                      '${r.side.isEmpty ? '' : '${r.side} · '}${r.sheet} / 第 ${r.row} 行${r.station.isEmpty ? '' : ' / 站位 ${r.station}'}',
+                      '${r.side.isEmpty ? '' : '${localText(context, r.side)} · '}${r.sheet} / ${localText(context, '第 ${r.row} 行')}${r.station.isEmpty ? '' : ' / ${localText(context, '站位 ${r.station}')}'}',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -406,7 +417,7 @@ class ItemDetail extends StatelessWidget {
                     ),
                     const SizedBox(height: 7),
                     SelectableText(
-                      '数量：${r.quantityText.isEmpty ? '空' : r.quantityText}\n位号：${r.positionsText.isEmpty ? '空' : r.positionsText}',
+                      '${localText(context, '数量')}：${r.quantityText.isEmpty ? localText(context, '空') : r.quantityText}\n${localText(context, '位号')}：${r.positionsText.isEmpty ? localText(context, '空') : r.positionsText}',
                       style: const TextStyle(fontSize: 12, height: 1.7),
                     ),
                     const SizedBox(height: 6),

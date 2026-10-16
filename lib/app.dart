@@ -14,16 +14,23 @@ import 'services/ai_service.dart';
 import 'services/report_export.dart';
 import 'ui/design.dart';
 import 'ui/results.dart';
+import 'ui/localized_text.dart';
+import 'l10n/localization.dart';
 
 class SmtCheckApp extends StatefulWidget {
   final List<String> arguments;
   final bool persist;
   final CheckReport? initialReport;
+  final String initialLanguage;
+  final Future<ImportedFile> Function(String, InputKind, String)?
+  workbookLoader;
   const SmtCheckApp({
     super.key,
     this.arguments = const [],
     this.persist = true,
     this.initialReport,
+    this.initialLanguage = 'zh',
+    this.workbookLoader,
   });
   @override
   State<SmtCheckApp> createState() => _SmtCheckAppState();
@@ -46,12 +53,15 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       aiBusy = false,
       settingsLoaded = false;
   int page = 0;
+  int sessionEpoch = 0;
+  late String language;
   String aiText = '', activity = '就绪 · 文件在本机核对', error = '';
   SharedPreferences? prefs;
   AiService? activeAi;
   @override
   void initState() {
     super.initState();
+    language = widget.initialLanguage;
     report = widget.initialReport;
     if (report != null) {
       bom = report!.files.first;
@@ -68,6 +78,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       try {
         prefs = await SharedPreferences.getInstance();
         dark = prefs!.getBool('dark') ?? false;
+        final savedLanguage = prefs!.getString('language');
+        if (supportedLanguages.contains(savedLanguage)) {
+          language = savedLanguage!;
+        }
         rules = CheckRules(
           excludeEnabled: prefs!.getBool('exclude') ?? true,
           keywords:
@@ -87,13 +101,15 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   Future<void> importArguments() async {
+    final epoch = sessionEpoch;
     for (final (flag, slot) in [('--bom', 0), ('--a', 1), ('--b', 2)]) {
+      if (!mounted || epoch != sessionEpoch) return;
       final index = widget.arguments.indexOf(flag);
       if (index >= 0 && index + 1 < widget.arguments.length) {
         await loadPath(widget.arguments[index + 1], slot);
       }
     }
-    if (bom != null && a != null) {
+    if (epoch == sessionEpoch && bom != null && a != null) {
       setState(() => merged = b != null);
       await runCheck();
     }
@@ -111,7 +127,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
 
   void notify(String text) {
     messenger.currentState?.showSnackBar(
-      SnackBar(content: Text(text), backgroundColor: const Color(0xFF282828)),
+      SnackBar(
+        content: LText(translate(text, language)),
+        backgroundColor: const Color(0xFF282828),
+      ),
     );
   }
 
@@ -122,23 +141,50 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     error = '';
   }
 
+  void clearSession() {
+    sessionEpoch++;
+    activeAi?.close();
+    activeAi = null;
+    setState(() {
+      bom = null;
+      a = null;
+      b = null;
+      busy = false;
+      aiBusy = false;
+      invalidate();
+      page = 0;
+      activity = '已清空，可重新导入文件';
+    });
+  }
+
+  Future<void> changeLanguage(String value) async {
+    setState(() => language = value);
+    try {
+      await prefs?.setString('language', value);
+    } catch (_) {
+      notify('语言已切换，持久保存失败');
+    }
+  }
+
   Future<void> loadPath(String path, int slot) async {
+    final epoch = sessionEpoch;
     setState(() {
       busy = true;
       error = '';
       activity = '正在解析原始工作簿…';
     });
     try {
-      final imported = await readWorkbookInBackground(
-        path,
-        slot == 0 ? InputKind.bom : InputKind.station,
-        slot == 1
-            ? (merged ? 'A' : '单表')
-            : slot == 2
-            ? 'B'
-            : '',
-      );
-      if (!mounted) return;
+      final imported =
+          await (widget.workbookLoader ?? readWorkbookInBackground)(
+            path,
+            slot == 0 ? InputKind.bom : InputKind.station,
+            slot == 1
+                ? (merged ? 'A' : '单表')
+                : slot == 2
+                ? 'B'
+                : '',
+          );
+      if (!mounted || epoch != sessionEpoch) return;
       setState(() {
         if (slot == 0) {
           bom = imported;
@@ -151,18 +197,24 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         activity = '已导入 ${imported.name} · ${imported.rows.length} 行';
       });
     } catch (e) {
-      if (mounted) setState(() => error = '导入失败：$e');
+      if (mounted && epoch == sessionEpoch) {
+        setState(() {
+          error = '导入失败：$e';
+          activity = '导入失败';
+        });
+      }
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted && epoch == sessionEpoch) setState(() => busy = false);
     }
   }
 
   Future<void> pick(int slot) async {
     try {
       final file = await openFile(
+        confirmButtonText: translate('导入', language),
         acceptedTypeGroups: [
-          const XTypeGroup(
-            label: 'Excel 工作簿',
+          XTypeGroup(
+            label: translate('Excel 工作簿', language),
             extensions: ['xlsx'],
             uniformTypeIdentifiers: ['org.openxmlformats.spreadsheetml.sheet'],
           ),
@@ -175,6 +227,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   Future<void> runCheck() async {
+    if (busy) return;
+    final epoch = sessionEpoch;
     if (bom == null || a == null || (merged && b == null)) {
       notify(merged ? '请先导入 BOM、站位表 A 和 B' : '请先导入 BOM 和一份站位表');
       return;
@@ -189,7 +243,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         inputStations,
         inputRules,
       );
-      if (!mounted) return;
+      if (!mounted || epoch != sessionEpoch) return;
       setState(() {
         report = result;
         selected = null;
@@ -200,9 +254,9 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             '核对完成 · ${result.count(CheckStatus.pass)} 项一致 / ${result.errors.length} 项异常';
       });
     } catch (e) {
-      if (mounted) setState(() => error = '核对失败：$e');
+      if (mounted && epoch == sessionEpoch) setState(() => error = '核对失败：$e');
     } finally {
-      if (mounted) setState(() => busy = false);
+      if (mounted && epoch == sessionEpoch) setState(() => busy = false);
     }
   }
 
@@ -246,6 +300,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   Future<void> askAi({bool test = false, CheckItem? item}) async {
+    final epoch = sessionEpoch;
     if (!test && report == null) {
       notify('请先完成一次核对');
       return;
@@ -278,12 +333,12 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  const LText(
                     '发送异常数据至 AI',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 14),
-                  Text(
+                  LText(
                     '接收地址：${config.endpoint.host}\n将发送${item == null ? '最多前 40 项异常' : '当前料号 ${item.part}'}的料号、描述、数量、位号及来源行号。原始 Excel 文件不会上传。',
                     style: const TextStyle(height: 1.7),
                   ),
@@ -308,7 +363,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           ),
         ),
       );
-      if (proceed != true || !mounted) return;
+      if (proceed != true || !mounted || epoch != sessionEpoch) return;
     }
     setState(() {
       aiBusy = true;
@@ -321,16 +376,23 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         config,
         report: test ? null : currentReport,
         item: item,
+        language: language,
       );
-      if (mounted) setState(() => aiText = text);
+      if (mounted &&
+          epoch == sessionEpoch &&
+          (test || identical(report, currentReport))) {
+        setState(() => aiText = text);
+      }
     } catch (e) {
-      if (mounted) {
+      if (mounted &&
+          epoch == sessionEpoch &&
+          (test || identical(report, currentReport))) {
         setState(() => aiText = '调用失败：$e\n请核对接口地址、模型、密钥与网络；规则核对结果仍然保留。');
       }
     } finally {
       service.close();
-      activeAi = null;
-      if (mounted) setState(() => aiBusy = false);
+      if (identical(activeAi, service)) activeAi = null;
+      if (mounted && epoch == sessionEpoch) setState(() => aiBusy = false);
     }
   }
 
@@ -340,6 +402,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     try {
       final ext = json ? 'json' : 'csv';
       final location = await getSaveLocation(
+        confirmButtonText: translate('保存', language),
         suggestedName:
             'SMT-CHECK-${snapshot.created.toIso8601String().replaceAll(RegExp(r'[:.]'), '-')}.$ext',
         acceptedTypeGroups: [
@@ -355,7 +418,9 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       if (location == null) return;
       await File(location.path).writeAsBytes(
         utf8.encode(
-          json ? ReportExport.json(snapshot) : ReportExport.csv(snapshot),
+          json
+              ? ReportExport.json(snapshot, language: language)
+              : ReportExport.csv(snapshot, language: language),
         ),
         flush: true,
       );
@@ -371,8 +436,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     title: 'SMT-CHECK',
     debugShowCheckedModeBanner: false,
     theme: desktopTheme(dark),
-    locale: const Locale('zh', 'CN'),
-    supportedLocales: const [Locale('zh', 'CN'), Locale('en')],
+    locale: Locale(language),
+    supportedLocales: const [Locale('zh'), Locale('en'), Locale('th')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
     scaffoldMessengerKey: messenger,
     home: Builder(
@@ -384,6 +449,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               unawaited(pick(0)),
           const SingleActivator(LogicalKeyboardKey.keyE, control: true): () =>
               unawaited(export(false)),
+          const SingleActivator(LogicalKeyboardKey.keyN, control: true):
+              clearSession,
         },
         child: Scaffold(
           body: LayoutBuilder(
@@ -410,13 +477,15 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text(
+                                    LText(
                                       [
                                         '核对工作台',
                                         '导入与规则',
                                         'AI 异常分析',
                                         '使用说明',
                                       ][page],
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontSize: 18,
                                         fontWeight: FontWeight.w700,
@@ -430,8 +499,48 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                                   ],
                                 ),
                               ),
+                              Container(
+                                key: const Key('language-selector'),
+                                height: 35,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                ),
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: p.line),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: language,
+                                    icon: const Icon(Icons.language, size: 16),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: p.text,
+                                      fontFamilyFallback: const [
+                                        'Noto Sans Thai',
+                                      ],
+                                    ),
+                                    items: [
+                                      for (final code in supportedLanguages)
+                                        DropdownMenuItem(
+                                          value: code,
+                                          child: Text(languageNames[code]!),
+                                        ),
+                                    ],
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        unawaited(changeLanguage(value));
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
                               Tooltip(
-                                message: dark ? '切换浅色主题' : '切换深色主题',
+                                message: localText(
+                                  context,
+                                  dark ? '切换浅色主题' : '切换深色主题',
+                                ),
                                 child: DeskButton(
                                   dark ? '浅色' : '深色',
                                   icon: dark
@@ -473,7 +582,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                               ),
                               const SizedBox(width: 8),
                               Expanded(
-                                child: Text(
+                                child: LText(
                                   busy ? '正在处理…' : activity,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -483,8 +592,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                                   ),
                                 ),
                               ),
-                              const Text(
-                                'SMT-CHECK  1.0',
+                              const LText(
+                                'SMT-CHECK  1.1',
                                 style: TextStyle(fontSize: 10),
                               ),
                             ],
@@ -531,7 +640,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(4),
                   ),
-                  child: const Text(
+                  child: const LText(
                     'SC',
                     style: TextStyle(
                       fontSize: 14,
@@ -546,7 +655,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                     child: FittedBox(
                       fit: BoxFit.scaleDown,
                       alignment: Alignment.centerLeft,
-                      child: Text(
+                      child: LText(
                         'SMT-CHECK',
                         style: TextStyle(
                           color: Colors.white,
@@ -563,7 +672,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           if (!compact)
             const Padding(
               padding: EdgeInsets.fromLTRB(22, 12, 0, 14),
-              child: Text(
+              child: LText(
                 '生产工程  /  QUALITY',
                 style: TextStyle(fontSize: 10, color: Color(0xFF888888)),
               ),
@@ -572,7 +681,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
               child: Tooltip(
-                message: labels[i],
+                message: localText(context, labels[i]),
                 child: Semantics(
                   button: true,
                   selected: page == i,
@@ -601,7 +710,14 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                         Icon(icons[i], size: 19),
                         if (!compact) ...[
                           const SizedBox(width: 11),
-                          Text(labels[i], style: const TextStyle(fontSize: 12)),
+                          Expanded(
+                            child: LText(
+                              labels[i],
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
                         ],
                       ],
                     ),
@@ -613,7 +729,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           if (!compact)
             const Padding(
               padding: EdgeInsets.all(22),
-              child: Text(
+              child: LText(
                 '本地核对引擎\n原文件只读 · 来源可追溯',
                 style: TextStyle(
                   color: Color(0xFF888888),
@@ -682,6 +798,12 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             primary: true,
             onPressed: busy || !settingsLoaded ? null : runCheck,
           ),
+          DeskButton(
+            '清空重来',
+            key: const Key('clear-session'),
+            icon: Icons.restart_alt,
+            onPressed: clearSession,
+          ),
         ],
       ),
       const SizedBox(height: 12),
@@ -695,9 +817,9 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             if (merged) ('B', b),
           ])
             Tooltip(
-              message: f?.path ?? '尚未选择文件',
-              child: Text(
-                '$label  ${f == null ? '待导入' : '${f.name.length > 29 ? '${f.name.substring(0, 26)}…' : f.name}  · ${f.rows.length}行'}',
+              message: f?.path ?? localText(context, '尚未选择文件'),
+              child: LText(
+                '$label  ${f == null ? localText(context, '待导入') : '${f.name.length > 29 ? '${f.name.substring(0, 26)}…' : f.name}  · ${localText(context, '${f.rows.length}行')}'}',
                 style: TextStyle(
                   fontSize: 11,
                   color: f == null
@@ -717,7 +839,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         Padding(
           padding: const EdgeInsets.only(top: 9),
           child: SelectableText(
-            error,
+            localText(context, error),
             style: const TextStyle(color: bad, fontSize: 12),
           ),
         ),
@@ -782,7 +904,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           child: Row(
             children: [
               Expanded(
-                child: Text(
+                child: LText(
                   label,
                   style: TextStyle(
                     fontSize: 11,
@@ -790,7 +912,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                   ),
                 ),
               ),
-              Text(
+              LText(
                 value,
                 style: TextStyle(
                   fontSize: 26,
@@ -817,7 +939,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                 color: Palette.of(context).muted,
               ),
               const SizedBox(height: 20),
-              const Text(
+              const LText(
                 '从原始文件，核对每一项物料',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
               ),
@@ -834,7 +956,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               ])
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(line, style: const TextStyle(fontSize: 12)),
+                  child: LText(line, style: const TextStyle(fontSize: 12)),
                 ),
               const SizedBox(height: 20),
               DeskButton(
@@ -856,7 +978,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              const LText(
                 '非贴片物料排除规则',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
               ),
@@ -896,8 +1018,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                 minLines: 5,
                 maxLines: 9,
                 style: const TextStyle(fontSize: 13),
-                decoration: const InputDecoration(
-                  hintText: '例如：锡膏\nPCB\n助焊剂\n包装材料',
+                decoration: InputDecoration(
+                  hintText: localText(context, '例如：锡膏\nPCB\n助焊剂\n包装材料'),
                 ),
               ),
               const SizedBox(height: 12),
@@ -920,7 +1042,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              const LText(
                 '导入审计',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
               ),
@@ -957,7 +1079,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              const LText(
                 '兼容 Chat Completions 的 AI 接口',
                 style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
               ),
@@ -969,18 +1091,21 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               const SizedBox(height: 16),
               TextField(
                 controller: url,
-                decoration: const InputDecoration(
-                  labelText: 'API 基础地址',
-                  hintText: 'https://服务商地址/v1 或 http://localhost:11434/v1',
+                decoration: InputDecoration(
+                  labelText: localText(context, 'API 基础地址'),
+                  hintText: localText(
+                    context,
+                    'https://服务商地址/v1 或 http://localhost:11434/v1',
+                  ),
                 ),
                 style: const TextStyle(fontSize: 13),
               ),
               const SizedBox(height: 14),
               TextField(
                 controller: model,
-                decoration: const InputDecoration(
-                  labelText: '模型名称',
-                  hintText: '填写服务商实际支持的模型',
+                decoration: InputDecoration(
+                  labelText: localText(context, '模型名称'),
+                  hintText: localText(context, '填写服务商实际支持的模型'),
                 ),
                 style: const TextStyle(fontSize: 13),
               ),
@@ -990,8 +1115,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                 obscureText: true,
                 enableSuggestions: false,
                 autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'API Key（本地无密钥服务可留空）',
+                decoration: InputDecoration(
+                  labelText: localText(context, 'API Key（本地无密钥服务可留空）'),
                 ),
                 style: const TextStyle(fontSize: 13),
               ),
@@ -1029,7 +1154,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               Row(
                 children: [
                   const Expanded(
-                    child: Text(
+                    child: LText(
                       'AI 分析结果',
                       style: TextStyle(
                         fontSize: 17,
@@ -1051,7 +1176,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               ),
               const SizedBox(height: 16),
               SelectableText(
-                aiText.isEmpty ? '尚未调用 AI。可先测试连接，再分析核对异常。' : aiText,
+                localText(
+                  context,
+                  aiText.isEmpty ? '尚未调用 AI。可先测试连接，再分析核对异常。' : aiText,
+                ),
                 style: TextStyle(
                   fontSize: 13,
                   height: 1.8,
@@ -1069,7 +1197,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          const LText(
             '核对规则与操作',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
           ),
@@ -1105,7 +1233,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               'Ctrl+O 导入 BOM；Ctrl+Enter 开始核对；Ctrl+E 导出 CSV。表格可横向滚动，点击料号行查看完整证据。',
             ),
           ]) ...[
-            Text(
+            LText(
               title,
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
