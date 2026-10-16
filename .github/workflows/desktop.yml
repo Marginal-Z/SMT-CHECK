@@ -75,6 +75,9 @@ jobs:
           if ($installer.ExitCode -ne 0) { throw "Application install failed: $($installer.ExitCode)" }
           $exe = Join-Path $installDir 'SMT-CHECK.exe'
           if (-not (Test-Path -LiteralPath $exe)) { throw 'Installed executable is missing' }
+          $expectedVersion = ((Get-Content pubspec.yaml | Where-Object { $_ -match '^version:' }) -replace '^version:\s*','') -split '\+'
+          $installedVersion = ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion.Trim() -split '\+')[0]
+          if ($installedVersion -ne $expectedVersion[0]) { throw 'Installed application version mismatch' }
           $process = Start-Process -FilePath $exe -WorkingDirectory $installDir -PassThru -WindowStyle Hidden
           try {
             Start-Sleep -Seconds 10
@@ -96,6 +99,13 @@ jobs:
         run: |
           sudo dpkg -i dist/SMT-CHECK-linux-amd64.deb
           test -f /usr/share/applications/smt-check.desktop
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          expected = next(line.split(':', 1)[1].strip().split('+')[0] for line in Path('pubspec.yaml').read_text().splitlines() if line.startswith('version:'))
+          installed = json.loads(Path('/opt/smt-check/data/flutter_assets/version.json').read_text())
+          assert installed['version'] == expected, installed
+          PY
           set +e
           timeout 15s xvfb-run -a /usr/bin/smt-check > linux-startup.log 2>&1
           result=$?

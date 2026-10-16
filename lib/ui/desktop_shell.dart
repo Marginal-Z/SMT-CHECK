@@ -14,6 +14,7 @@ class DesktopShell extends StatelessWidget {
   final ValueChanged<int> onPage;
   final ValueChanged<String> onLanguage;
   final VoidCallback onTheme;
+  final VoidCallback? onCheckUpdates;
   final Widget child;
   const DesktopShell({
     super.key,
@@ -26,6 +27,7 @@ class DesktopShell extends StatelessWidget {
     required this.onPage,
     required this.onLanguage,
     required this.onTheme,
+    this.onCheckUpdates,
     required this.child,
   });
   @override
@@ -45,30 +47,6 @@ class DesktopShell extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Image.asset(
-                    'assets/icons/app_icon.png',
-                    key: const Key('brand-icon'),
-                    width: 28,
-                    height: 28,
-                    filterQuality: FilterQuality.high,
-                    semanticLabel: 'SMT-CHECK',
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: c.maxWidth < 700 ? 90 : 108,
-                    child: const FittedBox(
-                      fit: BoxFit.scaleDown,
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'SMT-CHECK',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
                   Expanded(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -137,6 +115,24 @@ class DesktopShell extends StatelessWidget {
                       ),
                     ),
                   ),
+                  if (onCheckUpdates != null) ...[
+                    const SizedBox(width: 8),
+                    if (compact)
+                      IconButton(
+                        key: const Key('check-updates'),
+                        tooltip: localText(context, '检查更新'),
+                        onPressed: onCheckUpdates,
+                        icon: const Icon(Icons.system_update_alt, size: 18),
+                      )
+                    else
+                      DeskButton(
+                        '检查更新',
+                        key: const Key('check-updates'),
+                        icon: Icons.system_update_alt,
+                        variant: DeskButtonVariant.quiet,
+                        onPressed: onCheckUpdates,
+                      ),
+                  ],
                   const SizedBox(width: 8),
                   Container(
                     key: const Key('language-selector'),
@@ -206,7 +202,7 @@ class DesktopShell extends StatelessWidget {
                       style: TextStyle(fontSize: 11, color: p.muted),
                     ),
                   ),
-                  const Text('SMT-CHECK 1.6.0', style: TextStyle(fontSize: 10)),
+                  const Text('SMT-CHECK 1.7.0', style: TextStyle(fontSize: 10)),
                 ],
               ),
             ),

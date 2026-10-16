@@ -1,5 +1,76 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '检查更新': ['Check for updates', 'ตรวจสอบอัปเดต'],
+  '正在检查更新…': ['Checking for updates…', 'กำลังตรวจสอบอัปเดต…'],
+  '当前版本：{version}': [
+    'Current version: {version}',
+    'เวอร์ชันปัจจุบัน: {version}',
+  ],
+  '最新正式版本：{version}': [
+    'Latest stable version: {version}',
+    'เวอร์ชันเสถียรล่าสุด: {version}',
+  ],
+  '发现新版本 {version}': [
+    'Version {version} is available',
+    'มีเวอร์ชันใหม่ {version}',
+  ],
+  '当前已是最新版本': ['You are up to date', 'คุณใช้เวอร์ชันล่าสุดแล้ว'],
+  '更新说明': ['Release notes', 'รายละเอียดการอัปเดต'],
+  '此版本未提供更新说明。': [
+    'No release notes were provided.',
+    'เวอร์ชันนี้ไม่มีรายละเอียดการอัปเดต',
+  ],
+  '下载 Windows 安装包': [
+    'Download Windows installer',
+    'ดาวน์โหลดตัวติดตั้ง Windows',
+  ],
+  '下载 Linux 安装包': ['Download Linux installer', 'ดาวน์โหลดตัวติดตั้ง Linux'],
+  '查看发布页面': ['View release page', 'ดูหน้าการเผยแพร่'],
+  '在系统浏览器中下载完整安装包。': [
+    'Download the complete installer in your browser.',
+    'ดาวน์โหลดตัวติดตั้งฉบับเต็มผ่านเบราว์เซอร์ของระบบ',
+  ],
+  '暂未提供当前平台安装包，请查看发布页面。': [
+    'No installer is available for this platform. View the release page.',
+    'ยังไม่มีตัวติดตั้งสำหรับแพลตฟอร์มนี้ โปรดดูหน้าการเผยแพร่',
+  ],
+  '无法打开系统浏览器，请复制链接后打开。': [
+    'Unable to open your browser. Copy the link and open it manually.',
+    'เปิดเบราว์เซอร์ไม่ได้ โปรดคัดลอกลิงก์แล้วเปิดด้วยตนเอง',
+  ],
+  '复制链接': ['Copy link', 'คัดลอกลิงก์'],
+  '无法读取当前应用版本，请查看发布页面。': [
+    'Unable to read the installed version. View the release page.',
+    'อ่านเวอร์ชันที่ติดตั้งไม่ได้ โปรดดูหน้าการเผยแพร่',
+  ],
+  '更新检查暂时受限，请稍后重试或查看发布页面。': [
+    'Update checks are temporarily limited. Retry later or view the release page.',
+    'การตรวจสอบอัปเดตถูกจำกัดชั่วคราว โปรดลองภายหลังหรือดูหน้าการเผยแพร่',
+  ],
+  '暂未找到正式发布版本，请稍后重试。': [
+    'No stable release was found. Please retry later.',
+    'ไม่พบเวอร์ชันเสถียร โปรดลองภายหลัง',
+  ],
+  '更新服务器暂时不可用，请稍后重试。': [
+    'The update server is unavailable. Please retry later.',
+    'เซิร์ฟเวอร์อัปเดตไม่พร้อมใช้งาน โปรดลองภายหลัง',
+  ],
+  '检查更新超时，请检查网络后重试。': [
+    'Update check timed out. Check your connection and retry.',
+    'การตรวจสอบอัปเดตหมดเวลา โปรดตรวจสอบเครือข่ายแล้วลองใหม่',
+  ],
+  '无法连接更新服务器，请检查网络后重试。': [
+    'Unable to connect to the update server. Check your connection and retry.',
+    'เชื่อมต่อเซิร์ฟเวอร์อัปเดตไม่ได้ โปรดตรวจสอบเครือข่ายแล้วลองใหม่',
+  ],
+  '更新服务器返回的数据无效，请稍后重试。': [
+    'The update server returned invalid data. Please retry later.',
+    'ข้อมูลจากเซิร์ฟเวอร์อัปเดตไม่ถูกต้อง โปรดลองภายหลัง',
+  ],
+  '检查更新失败，请稍后重试或查看发布页面。': [
+    'Update check failed. Retry later or view the release page.',
+    'ตรวจสอบอัปเดตไม่สำเร็จ โปรดลองภายหลังหรือดูหน้าการเผยแพร่',
+  ],
   '关闭': ['Close', 'ปิด'],
   '查看全部位号': ['Show all positions', 'แสดงตำแหน่งทั้งหมด'],
   '共 {count} 个位号 · 保留重复项': [

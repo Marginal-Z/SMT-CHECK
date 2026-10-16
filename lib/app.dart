@@ -14,11 +14,13 @@ import 'services/ai_service.dart';
 import 'services/ai_findings.dart';
 import 'services/report_export.dart';
 import 'services/source_analysis.dart';
+import 'services/update_service.dart';
 import 'ui/design.dart';
 import 'ui/results.dart';
 import 'ui/localized_text.dart';
 import 'ui/desktop_shell.dart';
 import 'ui/ai_views.dart';
+import 'ui/update_dialog.dart';
 import 'l10n/localization.dart';
 
 class SmtCheckApp extends StatefulWidget {
@@ -30,6 +32,9 @@ class SmtCheckApp extends StatefulWidget {
   final Future<ImportedFile> Function(String, InputKind, String)?
   workbookLoader;
   final AiService Function()? aiServiceFactory;
+  final UpdateService Function()? updateServiceFactory;
+  final Future<String> Function()? installedVersionLoader;
+  final Future<bool> Function(Uri)? externalUrlLauncher;
   final Future<SourceAnalysisPlan> Function(
     ImportedFile,
     List<ImportedFile>,
@@ -46,6 +51,9 @@ class SmtCheckApp extends StatefulWidget {
     this.initialAccent = ThemeAccent.black,
     this.workbookLoader,
     this.aiServiceFactory,
+    this.updateServiceFactory,
+    this.installedVersionLoader,
+    this.externalUrlLauncher,
     this.sourcePlanner,
   });
   @override
@@ -70,6 +78,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       settingsLoaded = false;
   int page = 0;
   int settingsSection = 0;
+  bool updateDialogOpen = false;
   int sessionEpoch = 0;
   int aiEpoch = 0, batchLimit = 24000, sourceCompleted = 0, sourceTotal = 0;
   List<SourceAnalysisBatch> sourceBatches = [];
@@ -771,6 +780,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               setState(() => dark = !dark);
               unawaited(prefs?.setBool('dark', dark));
             },
+            onCheckUpdates: () => unawaited(checkUpdates(context)),
             child: switch (page) {
               0 => workspace(context),
               1 => aiPage(context),
@@ -782,6 +792,23 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       ),
     ),
   );
+
+  Future<void> checkUpdates(BuildContext context) async {
+    if (updateDialogOpen) return;
+    updateDialogOpen = true;
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (_) => UpdateDialog(
+          serviceFactory: widget.updateServiceFactory,
+          versionLoader: widget.installedVersionLoader,
+          linkOpener: widget.externalUrlLauncher,
+        ),
+      );
+    } finally {
+      updateDialogOpen = false;
+    }
+  }
 
   Widget workspace(BuildContext context) => LayoutBuilder(
     builder: (context, c) => Column(
