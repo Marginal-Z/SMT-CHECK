@@ -58,7 +58,7 @@ class DesktopShell extends StatelessWidget {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          for (final i in [0, 4, 5, 6, 1, 2, 3])
+                          for (final i in [0, 4, 5, 6, 1])
                             Tooltip(
                               message: localText(context, desktopPages[i]),
                               child: Semantics(
@@ -69,6 +69,9 @@ class DesktopShell extends StatelessWidget {
                                     horizontal: 2,
                                   ),
                                   child: TextButton(
+                                    key: i == 4
+                                        ? const Key('open-merge')
+                                        : ValueKey('nav-page-$i'),
                                     style: TextButton.styleFrom(
                                       foregroundColor: page == i
                                           ? p.accent
@@ -124,6 +127,35 @@ class DesktopShell extends StatelessWidget {
                       ),
                     ),
                   ),
+                  Container(width: 1, height: 20, color: p.line),
+                  for (final i in [2, 3])
+                    Tooltip(
+                      message: localText(context, desktopPages[i]),
+                      child: SizedBox(
+                        width: 36,
+                        height: 36,
+                        child: TextButton(
+                          key: ValueKey('nav-page-$i'),
+                          onPressed: () => onPage(i),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            foregroundColor: page == i ? p.accent : p.muted,
+                            backgroundColor: page == i
+                                ? p.accentSoft
+                                : Colors.transparent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          child: Icon(
+                            i == 2
+                                ? Icons.settings_outlined
+                                : Icons.help_outline,
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(width: 8),
                   Container(
                     key: const Key('language-selector'),
@@ -194,7 +226,7 @@ class DesktopShell extends StatelessWidget {
                     ),
                   ),
                   const Text(
-                    'SMT Fusion 1.13.0',
+                    'SMT Fusion 1.14.0',
                     style: TextStyle(fontSize: 10),
                   ),
                 ],
@@ -362,52 +394,50 @@ class SummaryStrip extends StatelessWidget {
   final CheckReport report;
   const SummaryStrip({super.key, required this.report});
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 14),
-    child: Wrap(
-      spacing: 38,
-      runSpacing: 8,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        for (final (label, value) in [
-          ('料号总数量', report.totalPartCount),
-          ('BOM料号数量', report.bomPartCount),
-          ('SMT站位表料号数量', report.smtPartCount),
-        ])
-          Column(
-            key: ValueKey('stat-$label'),
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              LText(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Palette.of(context).muted,
-                ),
+  Widget build(BuildContext context) {
+    final p = Palette.of(context);
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 13),
+      decoration: BoxDecoration(
+        color: p.panel,
+        border: Border.all(color: p.line),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Row(
+        children: [
+          for (final (label, value) in [
+            ('料号总数量', report.totalPartCount),
+            ('BOM料号数量', report.bomPartCount),
+            ('SMT站位表料号数量', report.smtPartCount),
+          ])
+            Expanded(
+              child: Column(
+                key: ValueKey('stat-$label'),
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  LText(label, style: TextStyle(fontSize: 11, color: p.muted)),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$value',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                '$value',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+            ),
+          Tooltip(
+            message: localText(
+              context,
+              '料号数按去重统计，含已排除和候选料；总数为 BOM 与 SMT 并集，A+B 相同料号只计一次，空料号不计。',
+            ),
+            child: Icon(Icons.info_outline, size: 16, color: p.muted),
           ),
-        Tooltip(
-          message: localText(
-            context,
-            '料号数按去重统计，含已排除和候选料；总数为 BOM 与 SMT 并集，A+B 相同料号只计一次，空料号不计。',
-          ),
-          child: Icon(
-            Icons.info_outline,
-            size: 16,
-            color: Palette.of(context).muted,
-          ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }

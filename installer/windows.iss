@@ -1,5 +1,5 @@
 #ifndef AppVersion
-#define AppVersion "1.13.0"
+#define AppVersion "1.14.0"
 #endif
 #ifndef AppArchitecture
   #define AppArchitecture "x64"
@@ -22,7 +22,7 @@ DisableProgramGroupPage=yes
 OutputDir=..\dist
 OutputBaseFilename=SMT-CHECK-Setup-{#AppArchitecture}
 SetupIconFile=..\windows\runner\resources\app_icon.ico
-UninstallDisplayIcon={app}\SMT-CHECK.exe
+UninstallDisplayIcon={app}\smt-fusion-20261017.ico
 #if AppArchitecture == "arm64"
 ArchitecturesAllowed=arm64
 ArchitecturesInstallIn64BitMode=arm64
@@ -52,18 +52,24 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\SMT Fusion"; Filename: "{app}\SMT-CHECK.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\SMT Fusion"; Filename: "{app}\SMT-CHECK.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\SMT Fusion"; Filename: "{app}\SMT-CHECK.exe"; WorkingDir: "{app}"; IconFilename: "{app}\smt-fusion-20261017.ico"; AppUserModelID: "MarginalZ.SMTFusion.Desktop"
+Name: "{autodesktop}\SMT Fusion"; Filename: "{app}\SMT-CHECK.exe"; WorkingDir: "{app}"; IconFilename: "{app}\smt-fusion-20261017.ico"; AppUserModelID: "MarginalZ.SMTFusion.Desktop"; Check: ShouldCreateDesktopShortcut
 
 [InstallDelete]
 Type: files; Name: "{userprograms}\SMT-CHECK\SMT-CHECK.lnk"
 Type: files; Name: "{autodesktop}\SMT-CHECK.lnk"
 
 [Run]
+Filename: "{app}\SMT-CHECK.exe"; Parameters: "--repair-icons"; Flags: runhidden waituntilterminated
 Filename: "{app}\SMT-CHECK.exe"; Description: "Launch SMT Fusion"; Flags: nowait postinstall skipifsilent
 Filename: "{app}\SMT-CHECK.exe"; Flags: nowait skipifnotsilent; Check: IsFusionUpdate
 
 [Code]
+function ShouldCreateDesktopShortcut: Boolean;
+begin
+  Result := WizardIsTaskSelected('desktopicon') or FileExists(ExpandConstant('{autodesktop}\SMT Fusion.lnk'));
+end;
+
 function IsFusionUpdate: Boolean;
 begin
   Result := ExpandConstant('{param:SMTFUSIONUPDATE|0}') <> '0';

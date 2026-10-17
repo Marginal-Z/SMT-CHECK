@@ -29,6 +29,7 @@ Assert-PeArchitecture (Join-Path $source 'SMT-CHECK.exe')
 $destination = Join-Path $taskRoot "dist/windows-$Architecture-$([Guid]::NewGuid().ToString('N'))"
 New-Item -ItemType Directory -Path $destination -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $source 'SMT-CHECK.exe') -Destination $destination -Force
+Copy-Item -LiteralPath (Join-Path $source 'smt-fusion-20261017.ico') -Destination $destination -Force
 # CMake can copy host CRT files even when compiling for ARM64. Select the
 # target CRT exclusively from the architecture-specific Visual Studio redist.
 Get-ChildItem -LiteralPath $source -Filter '*.dll' |

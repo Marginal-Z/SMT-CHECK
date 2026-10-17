@@ -70,7 +70,11 @@ class _ResultsViewState extends State<ResultsView> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, bounds) => buildResults(context, bounds.maxWidth > 1160),
+  );
+
+  Widget buildResults(BuildContext context, bool wide) {
     final p = Palette.of(context);
     final list = widget.report.items
         .where(
@@ -81,6 +85,7 @@ class _ResultsViewState extends State<ResultsView> {
                   .contains(query.toLowerCase()),
         )
         .toList();
+    final selectedVisible = list.contains(widget.selected);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -128,25 +133,45 @@ class _ResultsViewState extends State<ResultsView> {
                     ),
                   ),
                 ),
-                DeskButton(
-                  '导出 CSV',
-                  variant: DeskButtonVariant.quiet,
-                  icon: Icons.download_outlined,
-                  onPressed: () => widget.onExport(false),
-                ),
-                DeskButton(
-                  'JSON',
-                  variant: DeskButtonVariant.quiet,
-                  onPressed: () => widget.onExport(true),
+                PopupMenuButton<bool>(
+                  key: const Key('export-results-menu'),
+                  tooltip: localText(context, '导出结果'),
+                  onSelected: widget.onExport,
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: false, child: LText('导出 CSV')),
+                    PopupMenuItem(value: true, child: LText('导出 JSON')),
+                  ],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.download_outlined, size: 16, color: p.text),
+                        const SizedBox(width: 7),
+                        const LText('导出结果', style: TextStyle(fontSize: 12)),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.expand_more, size: 15),
+                      ],
+                    ),
+                  ),
                 ),
                 Container(width: 1, height: 20, color: p.line),
                 DeskButton(
-                  detailsOpen ? '收起详情' : '展开详情',
+                  detailsOpen && wide && selectedVisible ? '收起详情' : '展开详情',
                   variant: DeskButtonVariant.quiet,
                   icon: Icons.vertical_split_outlined,
-                  onPressed: widget.selected == null
+                  onPressed: !selectedVisible
                       ? null
-                      : () => setState(() => detailsOpen = !detailsOpen),
+                      : () {
+                          if (wide) {
+                            setState(() => detailsOpen = !detailsOpen);
+                          } else {
+                            openItem(context, widget.selected!, false);
+                          }
+                        },
                 ),
               ],
             ),
@@ -156,7 +181,7 @@ class _ResultsViewState extends State<ResultsView> {
         Expanded(
           child: LayoutBuilder(
             builder: (context, c) {
-              final showDetail = c.maxWidth > 1160;
+              final showDetail = wide;
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -311,7 +336,7 @@ class _ResultsViewState extends State<ResultsView> {
                       },
                     ),
                   ),
-                  if (showDetail && detailsOpen && widget.selected != null) ...[
+                  if (showDetail && detailsOpen && selectedVisible) ...[
                     const SizedBox(width: 14),
                     SizedBox(
                       width: 360,

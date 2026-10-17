@@ -18,7 +18,7 @@ class AiWorkbench extends StatelessWidget {
   final String notice;
   final DateTime? startedAt;
   final ValueChanged<bool> onMode;
-  final VoidCallback onRun, onCancel, onSettings, onCopy;
+  final VoidCallback onRun, onCancel, onCopy;
   final VoidCallback? onResume;
   const AiWorkbench({
     super.key,
@@ -33,7 +33,6 @@ class AiWorkbench extends StatelessWidget {
     required this.onMode,
     required this.onRun,
     required this.onCancel,
-    required this.onSettings,
     required this.onCopy,
     this.onResume,
     this.findings = const [],
@@ -63,14 +62,11 @@ class AiWorkbench extends StatelessWidget {
               selected: !sourceMode,
               onPressed: busy ? null : () => onMode(false),
             ),
-            DeskButton(
-              'AI 接口设置',
-              icon: Icons.settings_outlined,
-              onPressed: onSettings,
-            ),
           ],
         ),
         const SizedBox(height: 12),
+        caption(context, 'AI 接口统一在“设置 → 外观与 AI 接口”中配置。'),
+        const SizedBox(height: 10),
         Flexible(
           flex: 0,
           child: ConstrainedBox(

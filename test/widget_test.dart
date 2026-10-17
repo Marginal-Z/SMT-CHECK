@@ -26,7 +26,9 @@ void main() {
         final context = tester.element(find.byType(Scaffold).first);
         expect(Theme.of(context).brightness, Brightness.light);
         expect(Theme.of(context).useMaterial3, false);
-        await tester.tap(find.text('查看排除规则'));
+        await tester.tap(find.byTooltip('设置'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('导入与规则'));
         await tester.pumpAndSettle();
         expect(find.text('非贴片物料排除规则'), findsOneWidget);
         expect(tester.takeException(), isNull);

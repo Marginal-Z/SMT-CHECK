@@ -20,6 +20,7 @@ import 'services/report_export.dart';
 import 'services/source_analysis.dart';
 import 'services/update_service.dart';
 import 'services/update_installer.dart';
+import 'services/desktop_support.dart';
 import 'ui/design.dart';
 import 'ui/results.dart';
 import 'ui/localized_text.dart';
@@ -115,6 +116,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   int page = 0;
   int settingsSection = 0;
   bool updateDialogOpen = false;
+  bool iconsRepairing = false;
+  String iconsRepairStatus = '';
   int sessionEpoch = 0;
   int aiEpoch = 0, batchLimit = 24000, sourceCompleted = 0, sourceTotal = 0;
   List<SourceAnalysisBatch> sourceBatches = [];
@@ -1192,6 +1195,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             onPage: (value) {
               if (value == 5) {
                 openCad();
+              } else if (value == 4) {
+                openMerge();
               } else {
                 setState(() => page = value);
               }
@@ -1287,6 +1292,40 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     }
   }
 
+  Future<void> refreshDesktopIcons() async {
+    if (iconsRepairing) return;
+    setState(() {
+      iconsRepairing = true;
+      iconsRepairStatus = '';
+    });
+    try {
+      await repairDesktopIcons();
+      if (mounted) {
+        setState(
+          () => iconsRepairStatus = '已刷新本应用快捷方式和窗口图标；固定图标若仍旧，请取消固定后重新固定。',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(
+          () => iconsRepairStatus = e is FormatException
+              ? e.message
+              : '部分图标无法刷新，请检查快捷方式权限。',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => iconsRepairing = false);
+    }
+  }
+
+  Future<void> openHelpWebsite(bool guide) async {
+    try {
+      await openDocumentation(guide: guide, language: language);
+    } catch (_) {
+      if (mounted) notify('无法打开浏览器，请检查系统默认浏览器设置。');
+    }
+  }
+
   Widget workspace(BuildContext context) => LayoutBuilder(
     builder: (context, c) => Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1319,21 +1358,6 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                       onPressed: busy || aiBusy || cadBusy || !settingsLoaded
                           ? null
                           : runCheck,
-                    ),
-                    DeskButton(
-                      '原始文件 AI 核对',
-                      variant: DeskButtonVariant.quiet,
-                      icon: Icons.auto_awesome_outlined,
-                      onPressed: busy || aiBusy || cadBusy
-                          ? null
-                          : analyzeSources,
-                    ),
-                    DeskButton(
-                      '合并与导出',
-                      key: const Key('open-merge'),
-                      icon: Icons.merge_type,
-                      variant: DeskButtonVariant.quiet,
-                      onPressed: busy || aiBusy || cadBusy ? null : openMerge,
                     ),
                     DeskButton(
                       '清空重来',
@@ -1427,14 +1451,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                 style: TextStyle(fontSize: 12),
               ),
               const SizedBox(height: 20),
-              DeskButton(
-                '查看排除规则',
-                icon: Icons.rule_outlined,
-                onPressed: () => setState(() {
-                  page = 2;
-                  settingsSection = 1;
-                }),
-              ),
+              caption(context, '排除关键词在“设置 → 导入与规则”中统一维护。'),
             ],
           ),
         ),
@@ -1575,10 +1592,6 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             !busy
         ? () => unawaited(analyzeSources(resume: true))
         : null,
-    onSettings: () => setState(() {
-      page = 2;
-      settingsSection = 0;
-    }),
     onCopy: () {
       Clipboard.setData(
         ClipboardData(text: aiSourceMode ? sourceAiText : localAiText),
@@ -1656,6 +1669,28 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                   ),
                   const SizedBox(height: 12),
                   caption(context, '在软件内下载并校验安装包，无需打开发布页面。'),
+                  if (Platform.isWindows) ...[
+                    const SizedBox(height: 24),
+                    const Divider(),
+                    const SizedBox(height: 12),
+                    DeskButton(
+                      '刷新桌面图标',
+                      key: const Key('repair-desktop-icons'),
+                      icon: Icons.refresh,
+                      onPressed: iconsRepairing
+                          ? null
+                          : () => unawaited(refreshDesktopIcons()),
+                    ),
+                    const SizedBox(height: 8),
+                    caption(
+                      context,
+                      iconsRepairing
+                          ? '正在刷新图标…'
+                          : iconsRepairStatus.isNotEmpty
+                          ? iconsRepairStatus
+                          : '只刷新 SMT Fusion 的图标关联，不重启资源管理器。',
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1687,6 +1722,24 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
           const LText(
             '核对规则与操作',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              DeskButton(
+                '访问官网',
+                icon: Icons.language,
+                onPressed: () => unawaited(openHelpWebsite(false)),
+              ),
+              DeskButton(
+                '完整使用教程',
+                icon: Icons.menu_book_outlined,
+                primary: true,
+                onPressed: () => unawaited(openHelpWebsite(true)),
+              ),
+            ],
           ),
           const SizedBox(height: 20),
           for (final (title, body) in [

@@ -91,6 +91,10 @@ jobs:
       - name: Test
         run: flutter test --no-pub
 
+      - name: Test public website sources
+        if: runner.os == 'Linux' && matrix.arch == 'x64'
+        run: node --test website/check.mjs
+
       - name: Test startup log validation
         if: runner.os != 'Windows'
         run: python3 -m unittest discover -s tools -p 'test_startup_log.py'
@@ -111,7 +115,7 @@ jobs:
         shell: pwsh
         run: |
           $installDir = Join-Path $env:RUNNER_TEMP 'SMT-CHECK-Installed'
-          $installer = Start-Process -FilePath (Resolve-Path '${{ matrix.package }}').Path -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/DIR=$installDir",'/TASKS=' -Wait -PassThru -WindowStyle Hidden
+          $installer = Start-Process -FilePath (Resolve-Path '${{ matrix.package }}').Path -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-',"/DIR=$installDir",'/TASKS=desktopicon' -Wait -PassThru -WindowStyle Hidden
           if ($installer.ExitCode -ne 0) { throw "Application install failed: $($installer.ExitCode)" }
           $exe = Join-Path $installDir 'SMT-CHECK.exe'
           if (-not (Test-Path -LiteralPath $exe)) { throw 'Installed executable is missing' }
@@ -119,6 +123,7 @@ jobs:
           $installedVersion = ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion.Trim() -split '\+')[0]
           if ($installedVersion -ne $expectedVersion[0]) { throw 'Installed application version mismatch' }
           if ((Get-Item -LiteralPath $exe).VersionInfo.ProductName -ne 'SMT Fusion') { throw 'Product display name mismatch' }
+          ./tools/verify-windows-icons.ps1 -InstallDir $installDir
           $legacyPrefs = Join-Path $env:APPDATA 'com.smtcheck/SMT-CHECK/shared_preferences.json'
           $fusionPrefs = Join-Path $env:APPDATA 'com.smtcheck/SMT Fusion/shared_preferences.json'
           New-Item -ItemType Directory -Path (Split-Path $legacyPrefs) -Force | Out-Null
@@ -139,6 +144,7 @@ jobs:
           $restarted = @(Get-Process -Name 'SMT-CHECK' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
           if ($restarted.Count -ne 1) { throw 'Update did not restart the installed app exactly once' }
           $restarted | Stop-Process
+          ./tools/verify-windows-icons.ps1 -InstallDir $installDir
           $uninstaller = Start-Process -FilePath (Join-Path $installDir 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru -WindowStyle Hidden
           if ($uninstaller.ExitCode -ne 0 -or (Test-Path -LiteralPath $exe)) { throw 'Application uninstall failed' }
 
