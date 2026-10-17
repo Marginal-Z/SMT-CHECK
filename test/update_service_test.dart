@@ -36,6 +36,24 @@ UpdateService serviceFor(Map<String, dynamic> data) => UpdateService(
 );
 
 void main() {
+  test(
+    'installed local 1.11.0 can discover the published 1.11.1 installer',
+    () async {
+      final service = serviceFor(releaseData(tag: 'v1.11.1'));
+      addTearDown(service.close);
+      final release = await service.check(
+        currentVersion: '1.11.0+16',
+        platform: 'windows',
+        architecture: 'x64',
+      );
+      expect(release.hasUpdate, isTrue);
+      expect(release.latest.toString(), '1.11.1');
+      expect(
+        release.installer.toString(),
+        '$releaseRepository/releases/download/v1.11.1/SMT-CHECK-Setup-x64.exe',
+      );
+    },
+  );
   for (final (platform, arch, file) in [
     ('windows', 'x64', 'SMT-CHECK-Setup-x64.exe'),
     ('windows', 'arm64', 'SMT-CHECK-Setup-arm64.exe'),

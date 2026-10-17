@@ -1,5 +1,5 @@
 #ifndef AppVersion
-  #define AppVersion "1.11.0"
+#define AppVersion "1.11.1"
 #endif
 #ifndef AppArchitecture
   #define AppArchitecture "x64"

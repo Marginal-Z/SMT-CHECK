@@ -185,7 +185,7 @@ class DesktopShell extends StatelessWidget {
                     ),
                   ),
                   const Text(
-                    'SMT-CHECK 1.11.0',
+                    'SMT-CHECK 1.11.1',
                     style: TextStyle(fontSize: 10),
                   ),
                 ],
