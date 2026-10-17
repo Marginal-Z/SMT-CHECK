@@ -98,6 +98,21 @@ Future<void> ready(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+// A file can become visible just before rename's Future and the UI completion
+// finish. Allow real I/O and render that final state before settling animations.
+Future<void> exportAndWait(WidgetTester tester, String output) async {
+  await tester.runAsync(() async {
+    await tester.tap(find.byKey(const Key('export-cad')));
+    for (var i = 0; i < 300; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await tester.pump();
+      if (File(output).existsSync() && enabled(tester, 'export-cad')) return;
+    }
+    fail('CAD export did not finish with the export control re-enabled');
+  });
+  await tester.pumpAndSettle();
+}
+
 void main() {
   WidgetController.hitTestWarningShouldBeFatal = true;
   late Directory temp;
@@ -152,13 +167,7 @@ void main() {
     await selectUnit(tester, '毫米（mm）');
     await tester.tap(find.byKey(const Key('generate-cad')));
     await tester.pumpAndSettle();
-    await tester.runAsync(() async {
-      await tester.tap(find.byKey(const Key('export-cad')));
-      for (var i = 0; i < 300 && !File(target).existsSync(); i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-    });
-    await tester.pumpAndSettle();
+    await exportAndWait(tester, target);
     expect(File(target).existsSync(), isTrue);
     expect(CoordinateReader().read(target).records.map((r) => r.reference), [
       'R1',
@@ -264,13 +273,7 @@ void main() {
       find.byKey(const Key('cad-file-name')),
       'Manual-CAD',
     );
-    await tester.runAsync(() async {
-      await tester.tap(find.byKey(const Key('export-cad')));
-      for (var i = 0; i < 300 && !File(output).existsSync(); i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 20));
-      }
-    });
-    await tester.pumpAndSettle();
+    await exportAndWait(tester, output);
     expect(selector.suggested, 'Manual-CAD.xlsx');
     expect(File(output).existsSync(), isTrue);
     final imported = CoordinateReader().read(output);

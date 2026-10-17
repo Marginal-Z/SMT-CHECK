@@ -148,7 +148,7 @@ class _CadWorkspaceState extends State<CadWorkspace> {
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               color: widget.preview!.canExport
-                                  ? const Color(0xFF087343)
+                                  ? (p.dark ? good : const Color(0xFF087343))
                                   : p.alertText,
                             ),
                           ),
