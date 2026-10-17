@@ -225,10 +225,7 @@ class DesktopShell extends StatelessWidget {
                       style: TextStyle(fontSize: 11, color: p.muted),
                     ),
                   ),
-                  const Text(
-                    'SMT Fusion 1.14.0',
-                    style: TextStyle(fontSize: 10),
-                  ),
+                  const Text('SMT Fusion', style: TextStyle(fontSize: 10)),
                 ],
               ),
             ),
