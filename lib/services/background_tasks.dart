@@ -1,9 +1,11 @@
 import 'dart:isolate';
+import 'dart:io';
 import 'dart:typed_data';
 
 import '../core/checker.dart';
 import '../core/cad_coordinates.dart';
 import '../core/coordinate_reader.dart';
+import '../core/coordinate_comparison.dart';
 import '../core/models.dart';
 import '../core/station_merge.dart';
 import '../core/xlsx_reader.dart';
@@ -31,6 +33,27 @@ Future<Uint8List> encodeMergedWorkbookInBackground(MergedStationFile file) =>
 Future<CoordinateImport> readCoordinatesInBackground(String path) =>
     Isolate.run(() => CoordinateReader().read(path));
 
+Future<CoordinateImport> readComparisonCoordinatesInBackground(String path) =>
+    Isolate.run(() => CoordinateReader().read(path, forComparison: true));
+
+Future<CoordinateComparison> compareCoordinatesInBackground(
+  CoordinateImport a,
+  CoordinateImport b,
+  CoordinateCompareSettings settings,
+  CadUnit? unitA,
+  CadUnit? unitB,
+  bool confirmed,
+) => Isolate.run(
+  () => CoordinateComparator.compare(
+    a,
+    b,
+    settings,
+    unitA: unitA,
+    unitB: unitB,
+    frameConfirmed: confirmed,
+  ),
+);
+
 Future<CadPreview> generateCadInBackground(
   MergedStationFile bom,
   CoordinateImport coordinates,
@@ -39,6 +62,11 @@ Future<CadPreview> generateCadInBackground(
 
 Future<Uint8List> encodeCadInBackground(CadPreview preview) =>
     Isolate.run(() => CadWorkbookExport.encode(preview));
+
+Future<void> verifyCadFileInBackground(String path, CadPreview preview) =>
+    Isolate.run(
+      () => CadWorkbookExport.verify(File(path).readAsBytesSync(), preview),
+    );
 
 Future<SourceAnalysisPlan> prepareSourceAnalysisInBackground(
   ImportedFile bom,

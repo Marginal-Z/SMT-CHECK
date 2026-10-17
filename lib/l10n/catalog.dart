@@ -1,8 +1,10 @@
 // Application strings. Spreadsheet fields are never translated.
 import 'cad_catalog.dart';
+import 'coordinate_compare_catalog.dart';
 
 const catalog = <String, List<String>>{
   ...cadCatalog,
+  ...coordinateCompareCatalog,
   '合并站位表': ['Merge placement tables', 'รวมตาราง SMT'],
   '完成 A+B 核对后，在“合并与导出”逐项确认 NG、已排除物料和候选料是否纳入。全部确认后生成四列预览，再以自定义名称-BOM.xlsx 导出。撤销确认、更改文件或规则、重新核对都会使旧预览失效。':
       [

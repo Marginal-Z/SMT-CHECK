@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
 import 'cad_coordinates.dart';
+import 'cad_decimal.dart';
 
 class _TableRow {
   final int number;
@@ -36,6 +37,8 @@ class CoordinateReader {
       'x',
       'posx',
       'xmm',
+      'xmil',
+      'xinch',
       'x坐标',
       'centerx',
       'midx',
@@ -46,6 +49,8 @@ class CoordinateReader {
       'y',
       'posy',
       'ymm',
+      'ymil',
+      'yinch',
       'y坐标',
       'centery',
       'midy',
@@ -67,8 +72,19 @@ class CoordinateReader {
     'pins': ['pins'],
     'smd': ['smd'],
     'glued': ['glued'],
+    'board': [
+      'board',
+      'boardid',
+      'boardno',
+      'panel',
+      'panelid',
+      'pcb',
+      '板号',
+      '拼板号',
+    ],
+    'unit': ['unit', 'units', '单位', 'coordinateunit'],
   };
-  CoordinateImport read(String path) {
+  CoordinateImport read(String path, {bool forComparison = false}) {
     final file = File(path);
     if (file.lengthSync() > 30 * 1024 * 1024) {
       throw const FormatException('文件超过 30 MB，请拆分工作簿后导入。');
@@ -86,10 +102,30 @@ class CoordinateReader {
               utf8.decode(file.readAsBytesSync()).replaceFirst('\uFEFF', ''),
             ),
           ];
+    return _parse(path, tables, forComparison);
+  }
+
+  CoordinateImport readBytes(
+    List<int> bytes, {
+    String path = 'FAI450.xlsx',
+    bool forComparison = false,
+  }) {
+    if (bytes.length > 30 * 1024 * 1024) {
+      throw const FormatException('文件超过 30 MB，请拆分工作簿后导入。');
+    }
+    return _parse(path, _xlsx(bytes), forComparison);
+  }
+
+  CoordinateImport _parse(
+    String path,
+    List<_Table> tables,
+    bool forComparison,
+  ) {
     _Table? best;
     _TableRow? header;
     Map<String, int> columns = {};
     var score = -1;
+    final candidates = <String>{};
     for (final table in tables) {
       for (final row in table.rows.where((r) => r.number <= 100)) {
         final detected = <String, int>{};
@@ -102,6 +138,7 @@ class CoordinateReader {
           }
         }
         if (!['ref', 'x', 'y'].every(detected.containsKey)) continue;
+        candidates.add(table.name);
         final value =
             detected.length + (detected.containsKey('layer') ? 10 : 0);
         if (value > score) {
@@ -115,16 +152,54 @@ class CoordinateReader {
     if (best == null || header == null) {
       throw const FormatException('CAD 未找到位号、X、Y 坐标表头');
     }
+    for (final field in _aliases.entries) {
+      if (header.cells.where((c) => field.value.contains(_normal(c))).length >
+          1) {
+        throw FormatException('CAD 表头字段重复：${field.key}');
+      }
+    }
     if (!columns.containsKey('layer')) {
       throw const FormatException('CAD 原坐标缺少 Layer／面别列');
+    }
+    if (forComparison && !columns.containsKey('angle')) {
+      throw const FormatException('CAD 比较文件缺少 Orient.／角度列，不能推定为 0°');
+    }
+    if (forComparison && candidates.length > 1) {
+      throw const FormatException('CAD 存在多个坐标工作表，请明确选择一张表另存后比较');
     }
     final records = <CoordinateRecord>[], issues = <CadIssue>[];
     final filename = path.replaceAll('\\', '/').split('/').last;
     CadUnit? hint;
-    if (_normal(header.cells[columns['x']!]) == 'xmm' &&
-        _normal(header.cells[columns['y']!]) == 'ymm') {
-      hint = CadUnit.mm;
+    CadUnit? headerUnit(String axis) =>
+        switch (_normal(header!.cells[columns[axis]!])) {
+          'xmm' || 'ymm' => CadUnit.mm,
+          'xmil' || 'ymil' => CadUnit.mil,
+          'xinch' || 'yinch' => CadUnit.inch,
+          _ => null,
+        };
+    final ux = headerUnit('x'), uy = headerUnit('y');
+    if (ux != null && uy != null && ux != uy) {
+      issues.add(
+        CadIssue(
+          'CAD X/Y 坐标单位不一致',
+          code: 'unit',
+          file: filename,
+          sheet: best.name,
+          row: header.number,
+        ),
+      );
+    } else {
+      hint = ux ?? uy;
     }
+    final units = <CadUnit>{};
+    final metadata = <String, String>{};
+    for (final row in best.rows.where((r) => r.number < header!.number)) {
+      if (row.cells.length >= 2) {
+        metadata[row.cells.first] = row.cells.skip(1).join(' ');
+      }
+    }
+    var sourceCount = 0;
+    final seen = <String, int>{};
     for (final row in best.rows.where((r) => r.number > header!.number)) {
       String val(String key, [String fallback = '']) {
         final col = columns[key];
@@ -134,10 +209,12 @@ class CoordinateReader {
       }
 
       if (row.cells.every((c) => c.trim().isEmpty)) continue;
+      sourceCount++;
       final ref = val('ref').toUpperCase();
-      void issue(String reason) => issues.add(
+      void issue(String reason, {String code = 'record'}) => issues.add(
         CadIssue(
           reason,
+          code: code,
           reference: ref,
           file: filename,
           sheet: best!.name,
@@ -152,6 +229,33 @@ class CoordinateReader {
         issue('CAD 原坐标位号为空');
         continue;
       }
+      String normalizedLayer(String value) =>
+          switch (value.trim().toLowerCase()) {
+            'top' || 't' || 'adt' || 'front' => 'Top',
+            'bottom' || 'bot' || 'b' || 'adb' || 'back' || 'm' => 'Bottom',
+            _ => '',
+          };
+      final identity =
+          '$ref|${val('board').toUpperCase()}|${normalizedLayer(val('layer'))}';
+      final first = seen[identity];
+      if (first != null) {
+        issue('CAD 原坐标位号重复：首次位于 ${best.name} 第 $first 行', code: 'duplicate');
+      } else {
+        seen[identity] = row.number;
+      }
+      if (columns.containsKey('unit')) {
+        final u = switch (val('unit').toLowerCase()) {
+          'mm' || '毫米' => CadUnit.mm,
+          'mil' || 'mils' => CadUnit.mil,
+          'in' || 'inch' || 'inches' => CadUnit.inch,
+          _ => null,
+        };
+        if (u == null) {
+          issue('CAD 坐标单位为空或无法识别', code: 'unit');
+        } else {
+          units.add(u);
+        }
+      }
       if (columns.values.any(
         (col) =>
             col < row.cells.length &&
@@ -163,7 +267,21 @@ class CoordinateReader {
       }
       final x = double.tryParse(val('x')), y = double.tryParse(val('y'));
       final angle = double.tryParse(val('angle', '0'));
-      var invalid = false;
+      var invalid = false, literalInvalid = false;
+      for (final field in ['x', 'y', 'angle']) {
+        try {
+          final literal = val(field, field == 'angle' ? '0' : '');
+          final decimal = CadDecimal.parse(literal);
+          if (double.tryParse(literal) == 0 && decimal.value != BigInt.zero) {
+            invalid = true;
+            literalInvalid = true;
+          }
+        } on FormatException {
+          invalid = true;
+          literalInvalid = true;
+        }
+      }
+      // Field-specific errors below retain the established import diagnostics.
       if (x == null || !x.isFinite) {
         issue('CAD X 坐标为空或不是有限数值');
         invalid = true;
@@ -176,11 +294,16 @@ class CoordinateReader {
         issue('CAD 角度为空或不是有限数值');
         invalid = true;
       }
-      final layer = switch (val('layer').toLowerCase()) {
-        'top' || 't' || 'adt' || 'front' => 'Top',
-        'bottom' || 'bot' || 'b' || 'adb' || 'back' || 'm' => 'Bottom',
-        _ => '',
-      };
+      if (literalInvalid &&
+          x != null &&
+          x.isFinite &&
+          y != null &&
+          y.isFinite &&
+          angle != null &&
+          angle.isFinite) {
+        issue('CAD 数值格式无效或超出比较范围');
+      }
+      final layer = normalizedLayer(val('layer'));
       if (layer.isEmpty) {
         issue('CAD 无法识别面别：${val('layer')}');
         invalid = true;
@@ -211,6 +334,10 @@ class CoordinateReader {
             for (var i = 0; i < row.cells.length; i++)
               (i < header.cells.length ? header.cells[i] : '$i'): row.cells[i],
           },
+          board: val('board'),
+          rawX: val('x'),
+          rawY: val('y'),
+          rawAngle: val('angle', '0'),
         ),
       );
     }
@@ -224,15 +351,33 @@ class CoordinateReader {
           file: filename,
           sheet: best.name,
           row: header.number,
-          blocking: false,
+          blocking: forComparison,
         ),
       );
+    }
+    if (units.length > 1 ||
+        (hint != null && units.isNotEmpty && !units.contains(hint))) {
+      issues.add(
+        CadIssue(
+          'CAD 坐标单位不一致，请先确认并统一单位',
+          code: 'unit',
+          file: filename,
+          sheet: best.name,
+          row: header.number,
+        ),
+      );
+    } else if (units.length == 1) {
+      hint ??= units.single;
     }
     return CoordinateImport(
       path,
       List.unmodifiable(records),
       List.unmodifiable(issues),
       unitHint: hint,
+      sourceCount: sourceCount,
+      fields: Set.unmodifiable(columns.keys),
+      headers: List.unmodifiable(header.cells),
+      metadata: Map.unmodifiable(metadata),
     );
   }
 

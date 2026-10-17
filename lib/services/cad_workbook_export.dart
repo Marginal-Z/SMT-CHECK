@@ -5,6 +5,7 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
 import '../core/cad_coordinates.dart';
+import '../core/coordinate_reader.dart';
 
 class CadWorkbookExport {
   static Uint8List encode(CadPreview preview) {
@@ -149,7 +150,47 @@ class CadWorkbookExport {
       'xl/worksheets/sheet1.xml',
       xml.buildDocument().toXmlString().replaceAll('\r', '&#13;'),
     );
-    return Uint8List.fromList(ZipEncoder().encode(archive));
+    final bytes = Uint8List.fromList(ZipEncoder().encode(archive));
+    verify(bytes, preview);
+    return bytes;
+  }
+
+  /// Read the actual emitted OOXML, checking every identity and all ten fields.
+  /// No tolerance/rounding is applied to generated device coordinates.
+  static void verify(List<int> bytes, CadPreview expected) {
+    final decoded = CoordinateReader().readBytes(bytes, forComparison: true);
+    if (decoded.headers.join('\u0000') != CadPreview.headers.join('\u0000') ||
+        decoded.records.any((r) => r.sheet != 'Sheet1') ||
+        decoded.issues.isNotEmpty ||
+        decoded.records.length != expected.rows.length ||
+        decoded.totalCount != expected.rows.length) {
+      throw const FormatException('CAD 导出回读核验失败：元件数量或数据质量不一致');
+    }
+    final index = <String, CoordinateRecord>{};
+    for (final row in decoded.records) {
+      if (index.containsKey(row.reference)) {
+        throw const FormatException('CAD 导出回读核验失败：位号重复');
+      }
+      index[row.reference] = row;
+    }
+    final expectedReferences = <String>{};
+    for (final want in expected.rows) {
+      final reference = want.source.reference.trim().toUpperCase(),
+          got = index[want.source.reference.trim().toUpperCase()];
+      if (got == null ||
+          !expectedReferences.add(reference) ||
+          got.x != want.x ||
+          got.y != want.y ||
+          got.angle != want.angle ||
+          got.partType != want.source.partType ||
+          got.decal != want.source.decal ||
+          got.pins != want.source.pins ||
+          got.layer != want.source.layer ||
+          got.smd != want.source.smd ||
+          got.glued != want.source.glued) {
+        throw FormatException('CAD 导出回读核验失败：${want.source.reference}');
+      }
+    }
   }
 
   /// Resolves existing parents too, so symlinked directories cannot alias input.

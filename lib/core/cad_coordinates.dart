@@ -12,7 +12,7 @@ enum CadUnit {
 }
 
 class CadIssue {
-  final String reason, file, sheet, reference;
+  final String reason, file, sheet, reference, code;
   final int row;
   final bool blocking;
   final Map<String, String> raw;
@@ -22,13 +22,26 @@ class CadIssue {
     this.sheet = '',
     this.row = 0,
     this.reference = '',
+    this.code = '',
     this.blocking = true,
     this.raw = const {},
   });
 }
 
 class CoordinateRecord {
-  final String reference, partType, decal, layer, smd, glued, file, sheet;
+  final String reference,
+      partType,
+      decal,
+      layer,
+      smd,
+      glued,
+      file,
+      sheet,
+      board;
+  final String? rawX, rawY, rawAngle;
+  String get xText => rawX ?? x.toString();
+  String get yText => rawY ?? y.toString();
+  String get angleText => rawAngle ?? angle.toString();
   final int pins, row;
   final double x, y, angle;
   final Map<String, String> raw;
@@ -46,6 +59,10 @@ class CoordinateRecord {
     this.pins = 2,
     this.smd = 'Yes',
     this.glued = 'No',
+    this.board = '',
+    this.rawX,
+    this.rawY,
+    this.rawAngle,
     this.raw = const {},
   });
 }
@@ -55,7 +72,21 @@ class CoordinateImport {
   final List<CoordinateRecord> records;
   final List<CadIssue> issues;
   final CadUnit? unitHint;
-  const CoordinateImport(this.path, this.records, this.issues, {this.unitHint});
+  final int? sourceCount;
+  final Set<String> fields;
+  final List<String> headers;
+  final Map<String, String> metadata;
+  const CoordinateImport(
+    this.path,
+    this.records,
+    this.issues, {
+    this.unitHint,
+    this.sourceCount,
+    this.fields = const {},
+    this.headers = const [],
+    this.metadata = const {},
+  });
+  int get totalCount => sourceCount ?? records.length;
   String get name => path.replaceAll('\\', '/').split('/').last;
 }
 
@@ -122,11 +153,33 @@ class CadGenerator {
     CadUnit unit,
   ) {
     final issues = [...coordinates.issues];
-    final index = <String, CoordinateRecord>{};
+    final index = <String, CoordinateRecord>{},
+        ambiguous = <String>{
+          for (final issue in coordinates.issues.where(
+            (i) => i.code == 'duplicate',
+          ))
+            issue.reference.trim().toUpperCase(),
+        };
     double? minY, maxY;
     for (final record in coordinates.records) {
       final reference = record.reference.toUpperCase().trim();
+      if (reference.isEmpty ||
+          !['Top', 'Bottom'].contains(record.layer) ||
+          !record.angle.isFinite ||
+          record.pins < 0) {
+        issues.add(
+          CadIssue(
+            'CAD 原坐标元件信息无效',
+            reference: reference,
+            file: record.file,
+            sheet: record.sheet,
+            row: record.row,
+            raw: record.raw,
+          ),
+        );
+      }
       if (index.containsKey(reference)) {
+        ambiguous.add(reference);
         final first = index[reference]!;
         issues.add(
           CadIssue(
@@ -199,6 +252,8 @@ class CadGenerator {
           issue('CAD BOM 位号重复或归属冲突', reference);
           continue;
         }
+        // Never display a guessed match for a duplicated coordinate identity.
+        if (ambiguous.contains(reference)) continue;
         final record = index[reference];
         if (record == null) {
           issue('CAD BOM 位号缺少原始坐标', reference);

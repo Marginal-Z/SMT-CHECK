@@ -26,6 +26,9 @@ import 'ui/ai_views.dart';
 import 'ui/update_dialog.dart';
 import 'ui/merge_workspace.dart';
 import 'ui/cad_workspace.dart';
+import 'ui/coordinate_comparison_workspace.dart';
+import 'ui/coordinate_compare_settings.dart';
+import 'core/coordinate_comparison.dart';
 import 'l10n/localization.dart';
 
 class SmtCheckApp extends StatefulWidget {
@@ -96,6 +99,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   bool cadBusy = false;
   int cadEpoch = 0;
   String cadError = '', cadStage = '';
+  final coordinateCompare = CoordinateCompareController();
   var rules = const CheckRules();
   bool dark = false,
       merged = true,
@@ -149,6 +153,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   Future<void> initialize() async {
+    coordinateCompare.addListener(comparisonChanged);
     if (widget.persist) {
       try {
         prefs = await SharedPreferences.getInstance();
@@ -159,6 +164,18 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                 .firstOrNull ??
             accent;
         final savedLanguage = prefs!.getString('language');
+        final comparisonSettings = prefs!.getString(
+          'coordinateCompareSettings',
+        );
+        if (comparisonSettings != null) {
+          try {
+            coordinateCompare.settings = CoordinateCompareSettings.decode(
+              comparisonSettings,
+            );
+          } catch (_) {
+            activity = '坐标比较设置损坏，已使用默认值，请重新保存。';
+          }
+        }
         if (supportedLanguages.contains(savedLanguage)) {
           language = savedLanguage!;
         }
@@ -185,6 +202,19 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     if (widget.arguments.isNotEmpty) await importArguments();
   }
 
+  void comparisonChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> saveComparisonSettings(CoordinateCompareSettings value) async {
+    coordinateCompare.applySettings(value);
+    try {
+      await prefs?.setString('coordinateCompareSettings', value.encode());
+    } catch (_) {
+      notify('设置存储不可用 · 当前会话仍可核对');
+    }
+  }
+
   Future<void> importArguments() async {
     final epoch = sessionEpoch;
     for (final (flag, slot) in [('--bom', 0), ('--a', 1), ('--b', 2)]) {
@@ -209,6 +239,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     apiKey.dispose();
     mergeName.dispose();
     cadName.dispose();
+    coordinateCompare.removeListener(comparisonChanged);
+    coordinateCompare.dispose();
     super.dispose();
   }
 
@@ -256,6 +288,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       invalidate();
       page = 0;
       invalidateCad(clearCoordinates: true);
+      coordinateCompare.clear();
       cadName.text = 'SMT-CHECK_FAI450正确坐标';
       activity = '已清空，可重新导入文件';
     });
@@ -1004,6 +1037,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       );
       try {
         await temporary.writeAsBytes(bytes, flush: true);
+        await verifyCadFileInBackground(temporary.path, snapshot);
         if (!current()) return;
         await temporary.rename(target.path);
       } finally {
@@ -1138,7 +1172,12 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             language: language,
             activity: activity,
             dark: dark,
-            busy: busy || aiBusy || cadBusy || mergeExportBusy,
+            busy:
+                busy ||
+                aiBusy ||
+                cadBusy ||
+                mergeExportBusy ||
+                coordinateCompare.busy,
             hasError: error.isNotEmpty,
             onPage: (value) {
               if (value == 5) {
@@ -1156,6 +1195,13 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               0 => workspace(context),
               1 => aiPage(context),
               2 => settingsPage(context),
+              6 => CoordinateComparisonWorkspace(
+                controller: coordinateCompare,
+                onSettings: () => setState(() {
+                  page = 2;
+                  settingsSection = 3;
+                }),
+              ),
               5 => CadWorkspace(
                 bom: mergeSession?.canExport == true
                     ? mergeSession?.preview
@@ -1546,6 +1592,12 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             icon: Icons.info_outline,
             onPressed: () => setState(() => settingsSection = 2),
           ),
+          DeskButton(
+            '坐标比较设置',
+            selected: settingsSection == 3,
+            icon: Icons.tune,
+            onPressed: () => setState(() => settingsSection = 3),
+          ),
         ],
       ),
       const SizedBox(height: 16),
@@ -1553,6 +1605,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         child: switch (settingsSection) {
           0 => aiSettings(context),
           1 => rulesPage(context),
+          3 => CoordinateCompareSettingsPanel(
+            settings: coordinateCompare.settings,
+            onApply: (value) => unawaited(saveComparisonSettings(value)),
+          ),
           _ => SingleChildScrollView(
             child: Pane(
               child: Column(
