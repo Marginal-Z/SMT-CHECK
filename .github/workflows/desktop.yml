@@ -91,6 +91,10 @@ jobs:
       - name: Test
         run: flutter test --no-pub
 
+      - name: Test startup log validation
+        if: runner.os != 'Windows'
+        run: python3 -m unittest discover -s tools -p 'test_startup_log.py'
+
       - name: Build and package Windows
         if: runner.os == 'Windows'
         shell: pwsh

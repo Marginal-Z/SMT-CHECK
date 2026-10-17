@@ -26,8 +26,17 @@ codesign --verify --deep --strict "$app"
 app_pid=$!
 sleep 15
 kill -0 "$app_pid"
-cat "$install_dir/startup.log"
-if grep -E 'Unhandled Exception|ERROR:flutter|Failed to start' "$install_dir/startup.log"; then exit 1; fi
+cp "$install_dir/startup.log" "$install_dir/initial.log"
+cat "$install_dir/initial.log"
+python3 tools/check_startup_log.py "$install_dir/initial.log" --allow-startup-frame-clamp
+# Require a second live interval. Timestamp corrections are accepted only in
+# the initial interval; recurring corrections or any other error still fail.
+initial_lines="$(wc -l < "$install_dir/initial.log")"
+sleep 5
+kill -0 "$app_pid"
+tail -n "+$((initial_lines + 1))" "$install_dir/startup.log" > "$install_dir/steady.log"
+cat "$install_dir/steady.log"
+python3 tools/check_startup_log.py "$install_dir/steady.log"
 kill "$app_pid"
 wait "$app_pid" || true
 app_pid=''
