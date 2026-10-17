@@ -9,6 +9,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/models.dart';
+import 'core/station_merge.dart';
 import 'services/background_tasks.dart';
 import 'services/ai_service.dart';
 import 'services/ai_findings.dart';
@@ -21,6 +22,7 @@ import 'ui/localized_text.dart';
 import 'ui/desktop_shell.dart';
 import 'ui/ai_views.dart';
 import 'ui/update_dialog.dart';
+import 'ui/merge_workspace.dart';
 import 'l10n/localization.dart';
 
 class SmtCheckApp extends StatefulWidget {
@@ -70,6 +72,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   ImportedFile? bom, a, b;
   CheckReport? report;
   CheckItem? selected;
+  StationMergeSession? mergeSession;
+  CheckItem? mergeFocus;
+  final mergeName = TextEditingController(text: 'SMT-CHECK-BOM');
+  bool mergeExportBusy = false;
   var rules = const CheckRules();
   bool dark = false,
       merged = true,
@@ -112,6 +118,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     accent = widget.initialAccent;
     report = widget.initialReport;
     if (report != null) {
+      mergeSession = StationMergeSession(report!);
       bom = report!.files.first;
       a = report!.files[1];
       b = report!.files.length > 2 ? report!.files[2] : null;
@@ -180,6 +187,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     url.dispose();
     model.dispose();
     apiKey.dispose();
+    mergeName.dispose();
     super.dispose();
   }
 
@@ -196,6 +204,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     stopAi();
     report = null;
     selected = null;
+    mergeSession = null;
+    mergeFocus = null;
     aiText = '';
     aiNarratives = const {};
     sourceFindings = [];
@@ -219,6 +229,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       a = null;
       b = null;
       busy = false;
+      mergeExportBusy = false;
       aiBusy = false;
       invalidate();
       page = 0;
@@ -324,6 +335,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       if (!mounted || epoch != sessionEpoch) return;
       setState(() {
         report = result;
+        mergeSession = StationMergeSession(result);
+        mergeFocus = null;
         selected = null;
         aiText = '';
         aiNarratives = const {};
@@ -764,6 +777,98 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     }
   }
 
+  void openMerge([CheckItem? item]) => setState(() {
+    mergeFocus = item;
+    page = 4;
+  });
+
+  Future<void> exportMerged() async {
+    final session = mergeSession, epoch = sessionEpoch;
+    if (session == null || !session.canExport || mergeExportBusy) return;
+    final snapshot = session.preview!;
+    bool current() =>
+        mounted &&
+        epoch == sessionEpoch &&
+        identical(mergeSession, session) &&
+        identical(session.preview, snapshot) &&
+        session.canExport;
+    setState(() => mergeExportBusy = true);
+    try {
+      final location = await getSaveLocation(
+        suggestedName: mergedFileName(mergeName.text),
+        confirmButtonText: translate('保存', language),
+        acceptedTypeGroups: [
+          const XTypeGroup(
+            label: 'Excel (.xlsx)',
+            extensions: ['xlsx'],
+            uniformTypeIdentifiers: ['org.openxmlformats.spreadsheetml.sheet'],
+          ),
+        ],
+      );
+      if (location == null || !current()) return;
+      final raw = File(location.path);
+      final finalName = mergedFileName(raw.uri.pathSegments.last);
+      final target = File(
+        '${raw.parent.path}${Platform.pathSeparator}$finalName',
+      );
+      String canonical(File f) =>
+          (f.existsSync() ? f.resolveSymbolicLinksSync() : f.absolute.path)
+              .replaceAll('\\', '/');
+      String comparable(File f) =>
+          Platform.isWindows ? canonical(f).toLowerCase() : canonical(f);
+      if (session.report.files.any(
+        (f) => comparable(File(f.path)) == comparable(target),
+      )) {
+        notify('不能覆盖原始文件，请选择其他文件名或目录');
+        return;
+      }
+      if (target.path != raw.path && target.existsSync()) {
+        final overwrite = await showDialog<bool>(
+          context: navigator.currentContext!,
+          builder: (context) => AlertDialog(
+            title: const LText('文件已存在'),
+            content: Text('${localText(context, '是否覆盖合并文件？')}\n${target.path}'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const LText('取消'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const LText('覆盖'),
+              ),
+            ],
+          ),
+        );
+        if (overwrite != true || !current()) return;
+      }
+      final bytes = await encodeMergedWorkbookInBackground(snapshot);
+      if (!current()) return;
+      final temporary = File(
+        '${target.parent.path}${Platform.pathSeparator}.smt-check-merge-${DateTime.now().microsecondsSinceEpoch}.tmp',
+      );
+      try {
+        await temporary.writeAsBytes(bytes, flush: true);
+        if (!current()) return;
+        await temporary.rename(target.path);
+      } finally {
+        if (temporary.existsSync()) await temporary.delete();
+      }
+      if (current()) notify('合并文件已导出：${target.path}');
+    } catch (e) {
+      if (current()) {
+        final detail = e is FormatException
+            ? translate(e.message, language)
+            : '$e';
+        notify('导出失败：$detail');
+      }
+    } finally {
+      if (mounted && epoch == sessionEpoch) {
+        setState(() => mergeExportBusy = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) => MaterialApp(
     navigatorKey: navigator,
@@ -792,7 +897,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             language: language,
             activity: activity,
             dark: dark,
-            busy: busy || aiBusy,
+            busy: busy || aiBusy || mergeExportBusy,
             hasError: error.isNotEmpty,
             onPage: (value) => setState(() => page = value),
             onLanguage: (value) => unawaited(changeLanguage(value)),
@@ -804,6 +909,16 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               0 => workspace(context),
               1 => aiPage(context),
               2 => settingsPage(context),
+              4 => MergeWorkspace(
+                key: ValueKey(mergeSession),
+                session: mergeSession,
+                initialItem: mergeFocus,
+                nameController: mergeName,
+                busy: busy || aiBusy || mergeExportBusy,
+                onChanged: () => setState(() {}),
+                onExport: exportMerged,
+                onWorkbench: () => setState(() => page = 0),
+              ),
               _ => helpPage(context),
             },
           ),
@@ -869,6 +984,13 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                       onPressed: busy || aiBusy ? null : analyzeSources,
                     ),
                     DeskButton(
+                      '合并与导出',
+                      key: const Key('open-merge'),
+                      icon: Icons.merge_type,
+                      variant: DeskButtonVariant.quiet,
+                      onPressed: busy || aiBusy ? null : openMerge,
+                    ),
+                    DeskButton(
                       '清空重来',
                       variant: DeskButtonVariant.quiet,
                       key: const Key('clear-session'),
@@ -919,6 +1041,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                   onSelect: (i) => setState(() => selected = i),
                   onAi: aiBusy ? null : (item) => askAi(item: item),
                   onExport: (json) => export(json),
+                  onReview: mergeSession?.hasTwoStations == true
+                      ? openMerge
+                      : null,
+                  reviewFor: (item) => mergeSession?.reviewFor(item),
                 ),
         ),
       ],
@@ -1229,6 +1355,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             (
               '描述判断',
               '只忽略空白与英文大小写。±/+/数值/封装/品牌差异均保留并报告，不自动判断为等效。数量与各原始行的位号数也逐行交叉检查。',
+            ),
+            (
+              '合并站位表',
+              '完成 A+B 核对后，在“合并与导出”逐项确认 NG、已排除物料和候选料是否纳入。全部确认后生成四列预览，再以自定义名称-BOM.xlsx 导出。撤销确认、更改文件或规则、重新核对都会使旧预览失效。',
             ),
             (
               '导出与 AI',

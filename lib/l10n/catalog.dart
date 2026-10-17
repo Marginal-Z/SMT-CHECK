@@ -1,5 +1,120 @@
 // Application strings. Spreadsheet fields are never translated.
 const catalog = <String, List<String>>{
+  '合并站位表': ['Merge placement tables', 'รวมตาราง SMT'],
+  '完成 A+B 核对后，在“合并与导出”逐项确认 NG、已排除物料和候选料是否纳入。全部确认后生成四列预览，再以自定义名称-BOM.xlsx 导出。撤销确认、更改文件或规则、重新核对都会使旧预览失效。':
+      [
+        'After an A+B check, open Merge & export and review whether to include each NG, excluded and candidate item. Once all are reviewed, generate the four-column preview and export as custom-name-BOM.xlsx. Undoing a review, changing files or rules, or checking again invalidates the old preview.',
+        'หลังตรวจสอบ A+B เปิดรวมและส่งออก แล้วยืนยันว่าจะรวมรายการ NG วัสดุที่ยกเว้นและวัสดุทางเลือกแต่ละรายการหรือไม่ เมื่อยืนยันครบแล้วจึงสร้างตัวอย่างสี่คอลัมน์และส่งออกเป็นชื่อที่กำหนด-BOM.xlsx การยกเลิกการยืนยัน เปลี่ยนไฟล์หรือกฎ หรือตรวจสอบใหม่จะทำให้ตัวอย่างเดิมใช้ไม่ได้',
+      ],
+  '合并与导出': ['Merge & export', 'รวมและส่งออก'],
+  'A+B 合并与导出': ['Merge & export A+B', 'รวมและส่งออก A+B'],
+  '请先导入 BOM、站位表 A 和 B，并以 A+B 合并模式完成核对。': [
+    'Import BOM and placement tables A and B, then complete an A+B check.',
+    'นำเข้า BOM และตาราง SMT A และ B แล้วตรวจสอบในโหมด A+B ให้เสร็จ',
+  ],
+  '返回核对工作台': ['Back to workbench', 'กลับไปหน้าตรวจสอบ'],
+  '仅合并 SMT 站位表原始记录，保留四列；人工确认不改变核对状态。': [
+    'Merge original SMT records into four columns. Review decisions preserve check statuses.',
+    'รวมรายการ SMT ต้นฉบับเป็นสี่คอลัมน์ การยืนยันไม่เปลี่ยนสถานะการตรวจสอบ',
+  ],
+  '已确认 {count} / {total} 项': [
+    'Reviewed {count} / {total} items',
+    'ยืนยันแล้ว {count} / {total} รายการ',
+  ],
+  '人工确认': ['Manual review', 'ยืนยันโดยผู้ใช้'],
+  '合并文件预览': ['Merged preview', 'ดูตัวอย่างไฟล์ที่รวม'],
+  '合并方式': ['Merge mode', 'วิธีรวม'],
+  '同料号汇总': ['Summarize matching parts', 'รวมยอดรหัสวัสดุเดียวกัน'],
+  '保留 A+B 明细': ['Keep A+B detail rows', 'เก็บรายละเอียดแถว A+B'],
+  '生成合并预览': ['Generate preview', 'สร้างตัวอย่าง'],
+  '料号、描述均相同且数量有效时汇总；其余保留明细，位号原样拼接，不去重。': [
+    'Sum quantities only when part and description match exactly and quantities are valid. Keep other rows and original references, including duplicates.',
+    'รวมจำนวนเมื่อรหัสและคำอธิบายตรงกันทุกตัวและจำนวนถูกต้อง เก็บแถวอื่นและตำแหน่งเดิม รวมถึงตำแหน่งซ้ำ',
+  ],
+  '按 A 表、B 表顺序保留每行原始内容，仅移除人工确认不纳入的 SMT 记录。': [
+    'Keep original rows in A, then B order. Remove only SMT records explicitly marked to omit.',
+    'เก็บแถวต้นฉบับตามลำดับ A แล้ว B ตัดออกเฉพาะรายการ SMT ที่ผู้ใช้ยืนยันไม่รวม',
+  ],
+  '合并文件名': ['Merged file name', 'ชื่อไฟล์ที่รวม'],
+  '导出合并 Excel': ['Export merged Excel', 'ส่งออก Excel ที่รวม'],
+  '文件名自动以 BOM 结尾，格式为 .xlsx': [
+    'Names end in BOM with the .xlsx extension',
+    'ชื่อไฟล์ลงท้ายด้วย BOM นามสกุล .xlsx',
+  ],
+  '全部为 PASS，可直接生成合并预览。': [
+    'All items are PASS. You can generate the merged preview.',
+    'ทุกรายการเป็น PASS สามารถสร้างตัวอย่างที่รวมได้',
+  ],
+  '待人工确认': ['Awaiting review', 'รอการยืนยัน'],
+  '已确认：纳入合并': ['Reviewed: include', 'ยืนยันแล้ว: รวม'],
+  '已确认：不纳入合并': ['Reviewed: omit', 'ยืนยันแล้ว: ไม่รวม'],
+  '此项仅 BOM 有记录，不能补造 SMT 内容；确认后不会写入合并文件。': [
+    'This item exists only in BOM. No SMT content can be created; it will not be exported after acknowledgment.',
+    'รายการนี้มีเฉพาะใน BOM ไม่สามารถสร้างข้อมูล SMT ขึ้นเอง หลังยืนยันจะไม่เขียนในไฟล์ที่รวม',
+  ],
+  '确认纳入合并': ['Confirm inclusion', 'ยืนยันให้รวม'],
+  '确认不纳入合并': ['Confirm omission', 'ยืนยันไม่รวม'],
+  '撤销确认': ['Undo review', 'ยกเลิกการยืนยัน'],
+  '人工确认合并': ['Review for merge', 'ยืนยันเพื่อรวม'],
+  '还有 {count} 项待人工确认，确认后才能合并和导出。': [
+    '{count} items still need review before merging and exporting.',
+    'ยังมี {count} รายการรอการยืนยันก่อนรวมและส่งออก',
+  ],
+  '人工确认已完成，点击“生成合并预览”。': [
+    'Review complete. Click Generate preview.',
+    'ยืนยันครบแล้ว กดสร้างตัวอย่าง',
+  ],
+  '预览 {count} 行 · 纳入 {total} 条 SMT 原始记录 · 不纳入 {omitted} 条': [
+    'Preview: {count} rows · Include {total} SMT source rows · Omit {omitted}',
+    'ตัวอย่าง {count} แถว · รวมรายการ SMT ต้นฉบับ {total} แถว · ไม่รวม {omitted} แถว',
+  ],
+  '没有纳入的 SMT 记录，导出文件将仅包含四列表头。': [
+    'No SMT records included. The export will contain only the four headers.',
+    'ไม่มีรายการ SMT ที่รวม ไฟล์ส่งออกจะมีเฉพาะหัวตารางสี่คอลัมน์',
+  ],
+  '请输入有效文件名，不含路径或特殊字符': [
+    'Enter a valid file name without paths or special characters',
+    'กรอกชื่อไฟล์ที่ถูกต้องโดยไม่มีเส้นทางหรืออักขระพิเศษ',
+  ],
+  '文件名过长，请缩短至 180 个字符以内': [
+    'Shorten the file name to 180 characters or fewer',
+    'ย่อชื่อไฟล์ให้ไม่เกิน 180 ตัวอักษร',
+  ],
+  '不能覆盖原始文件，请选择其他文件名或目录': [
+    'Original files cannot be overwritten. Choose another name or folder.',
+    'ไม่สามารถเขียนทับไฟล์ต้นฉบับ โปรดเลือกชื่อหรือโฟลเดอร์อื่น',
+  ],
+  '文件已存在': ['File exists', 'มีไฟล์อยู่แล้ว'],
+  '是否覆盖合并文件？': ['Overwrite the merged file?', 'เขียนทับไฟล์ที่รวมหรือไม่'],
+  '覆盖': ['Overwrite', 'เขียนทับ'],
+  '合并文件已导出：{path}': [
+    'Merged file exported: {path}',
+    'ส่งออกไฟล์ที่รวมแล้ว: {path}',
+  ],
+  '请先以 A+B 合并模式完成核对': [
+    'Complete an A+B check first',
+    'โปรดตรวจสอบในโหมด A+B ให้เสร็จก่อน',
+  ],
+  '请先逐项确认 NG、已排除物料和候选料': [
+    'Review every NG, excluded and candidate item first',
+    'โปรดยืนยันรายการ NG วัสดุที่ยกเว้นและวัสดุทางเลือกทุกรายการก่อน',
+  ],
+  '站位表记录重复归属，请重新核对': [
+    'A placement row belongs to multiple results. Run the check again.',
+    'แถว SMT อยู่ในผลลัพธ์หลายรายการ โปรดตรวจสอบใหม่',
+  ],
+  '核对结果与站位表记录不完整对应，请重新核对': [
+    'The results do not cover the placement records exactly. Run the check again.',
+    'ผลตรวจสอบไม่ครอบคลุมรายการ SMT อย่างครบถ้วน โปรดตรวจสอบใหม่',
+  ],
+  '合并记录超过 Excel 行数限制': [
+    'Merged rows exceed the Excel row limit',
+    'จำนวนแถวที่รวมเกินขีดจำกัด Excel',
+  ],
+  '单元格内容无法完整写入 Excel：{cell}': [
+    'Cell content cannot be fully written to Excel: {cell}',
+    'ไม่สามารถเขียนเนื้อหาเซลล์ลง Excel ได้ครบถ้วน: {cell}',
+  ],
   '关于与更新': ['About & updates', 'เกี่ยวกับและอัปเดต'],
   '原生桌面应用 · Windows / Linux / macOS': [
     'Native desktop app · Windows / Linux / macOS',

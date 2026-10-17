@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../core/models.dart';
+import '../core/station_merge.dart';
 import '../core/positions.dart';
 import 'design.dart';
 import 'position_chips.dart';
@@ -16,6 +17,8 @@ class ResultsView extends StatefulWidget {
   final ValueChanged<CheckItem> onSelect;
   final ValueChanged<CheckItem>? onAi;
   final ValueChanged<bool> onExport;
+  final ValueChanged<CheckItem>? onReview;
+  final ManualReview? Function(CheckItem)? reviewFor;
   const ResultsView({
     super.key,
     required this.report,
@@ -23,6 +26,8 @@ class ResultsView extends StatefulWidget {
     required this.onSelect,
     required this.onAi,
     required this.onExport,
+    this.onReview,
+    this.reviewFor,
   });
   @override
   State<ResultsView> createState() => _ResultsViewState();
@@ -55,6 +60,8 @@ class _ResultsViewState extends State<ResultsView> {
               key: ValueKey(item),
               item: item,
               onAi: widget.onAi,
+              onReview: widget.onReview,
+              manualReview: widget.reviewFor?.call(item),
             ),
           ),
         ),
@@ -343,6 +350,10 @@ class _ResultsViewState extends State<ResultsView> {
                                 key: ValueKey(widget.selected),
                                 item: widget.selected!,
                                 onAi: widget.onAi,
+                                onReview: widget.onReview,
+                                manualReview: widget.reviewFor?.call(
+                                  widget.selected!,
+                                ),
                               ),
                             ),
                           ],
@@ -491,7 +502,15 @@ class _ResultsViewState extends State<ResultsView> {
 class ItemDetail extends StatelessWidget {
   final CheckItem item;
   final ValueChanged<CheckItem>? onAi;
-  const ItemDetail({super.key, required this.item, required this.onAi});
+  final ValueChanged<CheckItem>? onReview;
+  final ManualReview? manualReview;
+  const ItemDetail({
+    super.key,
+    required this.item,
+    required this.onAi,
+    this.onReview,
+    this.manualReview,
+  });
   @override
   Widget build(BuildContext context) {
     final p = Palette.of(context);
@@ -504,6 +523,29 @@ class ItemDetail extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           ResultBadge(status: item.status, label: item.label),
+          if (item.status != CheckStatus.pass && onReview != null) ...[
+            const SizedBox(height: 10),
+            LText(
+              manualReview == null
+                  ? '待人工确认'
+                  : manualReview!.include
+                  ? '已确认：纳入合并'
+                  : '已确认：不纳入合并',
+              style: TextStyle(
+                fontSize: 12,
+                color: manualReview == null ? p.alertText : p.muted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            DeskButton(
+              '人工确认合并',
+              icon: Icons.fact_check_outlined,
+              onPressed: () {
+                if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+                onReview!(item);
+              },
+            ),
+          ],
           const SizedBox(height: 9),
           SelectableText(
             item.part.isEmpty ? localText(context, '空料号') : item.part,
