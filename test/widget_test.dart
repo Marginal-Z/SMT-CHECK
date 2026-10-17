@@ -20,7 +20,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.resetPhysicalSize);
         addTearDown(tester.view.resetDevicePixelRatio);
-        await tester.pumpWidget(const SmtCheckApp(persist: false));
+        await tester.pumpWidget(const SmtFusionApp(persist: false));
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         final context = tester.element(find.byType(Scaffold).first);
@@ -46,7 +46,7 @@ void main() {
         [fixture.row('K-123', '1', 'R2')],
       );
       await tester.pumpWidget(
-        SmtCheckApp(persist: false, initialReport: report),
+        SmtFusionApp(persist: false, initialReport: report),
       );
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
@@ -67,7 +67,7 @@ void main() {
       [fixture.row('ONE', '1', 'R1'), fixture.row('TWO', '1', 'R2')],
       [fixture.row('ONE', '1', 'R1'), fixture.row('TWO', '1', 'R2')],
     );
-    await tester.pumpWidget(SmtCheckApp(persist: false, initialReport: report));
+    await tester.pumpWidget(SmtFusionApp(persist: false, initialReport: report));
     await tester.pumpAndSettle();
     await tester.tap(find.text('深色'));
     await tester.pumpAndSettle();
@@ -93,7 +93,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
-        SmtCheckApp(
+        SmtFusionApp(
           persist: false,
           initialReport: fixture.check(
             [fixture.row('KEEP', '1', 'R1')],
@@ -145,7 +145,7 @@ void main() {
           [fixture.row('MATCH', '2', 'R2 R1'), fixture.row('EXTRA', '1', 'C5')],
         );
         await tester.pumpWidget(
-          SmtCheckApp(
+          SmtFusionApp(
             persist: false,
             initialLanguage: language,
             initialReport: report,

@@ -107,7 +107,7 @@ void main() {
       buildSignature: '',
     );
     await tester.pumpWidget(
-      SmtCheckApp(
+      SmtFusionApp(
         persist: false,
         updateServiceFactory: () => ControlledUpdates(
           Future.value(
@@ -145,7 +145,7 @@ void main() {
           final installer = ControlledInstaller();
           var quits = 0;
           await tester.pumpWidget(
-            SmtCheckApp(
+            SmtFusionApp(
               persist: false,
               initialLanguage: language,
               installedVersionLoader: () async => '1.12.0',
@@ -228,7 +228,7 @@ void main() {
     final pending = Completer<AppRelease>();
     final service = ControlledUpdates(pending.future);
     await tester.pumpWidget(
-      SmtCheckApp(
+      SmtFusionApp(
         persist: false,
         installedVersionLoader: () async => '1.12.0',
         updateServiceFactory: () => service,
@@ -258,7 +258,7 @@ void main() {
       final updates = <ControlledUpdates>[];
       final installer = ControlledInstaller()..fail = true;
       await tester.pumpWidget(
-        SmtCheckApp(
+        SmtFusionApp(
           persist: false,
           installedVersionLoader: () async => '1.12.0',
           updateInstaller: installer,

@@ -315,7 +315,7 @@ class _CoordinateComparisonWorkspaceState
                           ),
                         ),
                         DeskButton(
-                          '设置',
+                          '比较设置',
                           key: const Key('coordinate-open-settings'),
                           onPressed: widget.onSettings,
                           icon: Icons.tune,
@@ -485,116 +485,121 @@ class _CoordinateComparisonWorkspaceState
                 padding: EdgeInsets.zero,
                 child: Column(
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.all(10),
-                      child: Wrap(
-                        spacing: 12,
-                        runSpacing: 8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          for (final entry in [
-                            (CoordinateResultPool.active, '核对结果'),
-                            (CoordinateResultPool.excluded, '已排除物料'),
-                            (CoordinateResultPool.all, '全部'),
-                          ])
-                            DeskButton(
-                              entry.$2,
-                              key: ValueKey('coordinate-pool-${entry.$1.name}'),
-                              variant: DeskButtonVariant.segment,
-                              selected: c.pool == entry.$1,
-                              onPressed: () {
-                                c.pool = entry.$1;
-                                if (c.pool == CoordinateResultPool.excluded) {
-                                  c.filter = null;
-                                  c.onlyErrors = false;
-                                }
-                                c.changed();
-                              },
-                            ),
-                          SizedBox(
-                            width: math.min(240, constraints.maxWidth - 50),
-                            child: TextField(
-                              key: const Key('coordinate-search'),
-                              controller: search,
-                              decoration: InputDecoration(
-                                hintText: localText(context, '搜索 RefDes'),
-                                prefixIcon: const Icon(Icons.search, size: 18),
-                                isDense: true,
-                              ),
-                              onChanged: (v) {
-                                c.query = v;
-                                c.changed();
-                              },
-                            ),
-                          ),
-                          SizedBox(
-                            width: math.min(
-                              260 * MediaQuery.textScalerOf(context).scale(1),
-                              constraints.maxWidth - 50,
-                            ),
-                            child: DropdownButton<CadDifferenceType?>(
-                              key: const Key('coordinate-filter'),
-                              isExpanded: true,
-                              itemHeight: null,
-                              value: c.filter,
-                              selectedItemBuilder: (context) => [
-                                for (final label in [
-                                  '全部',
-                                  ...CadDifferenceType.values.map(
-                                    (v) => v.label,
-                                  ),
-                                ])
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: Tooltip(
-                                      message: localText(context, label),
-                                      child: LText(
-                                        label,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                              items: [
-                                DropdownMenuItem(
-                                  value: null,
-                                  child: LText('全部'),
-                                ),
-                                for (final type in CadDifferenceType.values)
-                                  DropdownMenuItem(
-                                    value: type,
-                                    child: LText(type.label),
-                                  ),
-                              ],
-                              onChanged: (v) {
-                                c.filter = v;
-                                c.changed();
-                              },
-                            ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Checkbox(
-                                value: c.onlyErrors,
-                                onChanged: (v) {
-                                  c.onlyErrors = v ?? false;
+                    Visibility(
+                      visible: r != null,
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Wrap(
+                          spacing: 12,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            for (final entry in [
+                              (CoordinateResultPool.active, '核对结果'),
+                              (CoordinateResultPool.excluded, '已排除物料'),
+                              (CoordinateResultPool.all, '全部'),
+                            ])
+                              DeskButton(
+                                entry.$2,
+                                key: ValueKey('coordinate-pool-${entry.$1.name}'),
+                                variant: DeskButtonVariant.segment,
+                                selected: c.pool == entry.$1,
+                                onPressed: () {
+                                  c.pool = entry.$1;
+                                  if (c.pool == CoordinateResultPool.excluded) {
+                                    c.filter = null;
+                                    c.onlyErrors = false;
+                                  }
                                   c.changed();
                                 },
                               ),
-                              const LText('仅显示异常'),
-                            ],
-                          ),
-                          Text('${rows.length}'),
-                        ],
+                            SizedBox(
+                              width: math.min(240, constraints.maxWidth - 50),
+                              child: TextField(
+                                key: const Key('coordinate-search'),
+                                controller: search,
+                                decoration: InputDecoration(
+                                  hintText: localText(context, '搜索 RefDes'),
+                                  prefixIcon: const Icon(Icons.search, size: 18),
+                                  isDense: true,
+                                ),
+                                onChanged: (v) {
+                                  c.query = v;
+                                  c.changed();
+                                },
+                              ),
+                            ),
+                            SizedBox(
+                              width: math.min(
+                                260 * MediaQuery.textScalerOf(context).scale(1),
+                                constraints.maxWidth - 50,
+                              ),
+                              child: DropdownButton<CadDifferenceType?>(
+                                key: const Key('coordinate-filter'),
+                                isExpanded: true,
+                                itemHeight: null,
+                                value: c.filter,
+                                selectedItemBuilder: (context) => [
+                                  for (final label in [
+                                    '全部',
+                                    ...CadDifferenceType.values.map(
+                                      (v) => v.label,
+                                    ),
+                                  ])
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Tooltip(
+                                        message: localText(context, label),
+                                        child: LText(
+                                          label,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                                items: [
+                                  DropdownMenuItem(
+                                    value: null,
+                                    child: LText('全部'),
+                                  ),
+                                  for (final type in CadDifferenceType.values)
+                                    DropdownMenuItem(
+                                      value: type,
+                                      child: LText(type.label),
+                                    ),
+                                ],
+                                onChanged: (v) {
+                                  c.filter = v;
+                                  c.changed();
+                                },
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Checkbox(
+                                  value: c.onlyErrors,
+                                  onChanged: (v) {
+                                    c.onlyErrors = v ?? false;
+                                    c.changed();
+                                  },
+                                ),
+                                const LText('仅显示异常'),
+                              ],
+                            ),
+                            Text('${rows.length}'),
+                          ],
+                        ),
                       ),
                     ),
                     Expanded(
-                      child: rows.isEmpty
+                      child: r == null
+                          ? emptyState(context)
+                          : rows.isEmpty
                           ? Center(
                               child: LText(
-                                r == null ? '导入两个坐标文件后开始比较。' : '没有符合筛选条件的记录。',
+                                '没有符合筛选条件的记录。',
                               ),
                             )
                           : LayoutBuilder(
@@ -623,6 +628,95 @@ class _CoordinateComparisonWorkspaceState
       },
     ),
   );
+  Widget emptyState(BuildContext context) {
+    final p = Palette.of(context);
+    final filesReady = c.a != null && c.b != null;
+    final steps = [
+      (
+        '1',
+        filesReady ? '坐标文件 A 与 B 已就绪' : '分别导入坐标文件 A 和 B',
+      ),
+      ('2', c.confirmed ? '坐标基准已确认' : '确认单位、原点、轴方向与镜像规则'),
+      (
+        '3',
+        filesReady && c.confirmed
+            ? '开始比较并查看差异明细'
+            : '完成文件与坐标确认后开始比较',
+      ),
+    ];
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: p.accentSoft,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.compare_arrows, color: p.accent, size: 26),
+              ),
+              const SizedBox(height: 16),
+              const LText(
+                '准备坐标差异比较',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              LText(
+                '导入两个文件并确认坐标基准后，系统将按 RefDes 匹配元件并生成差异表。',
+                style: TextStyle(color: p.muted),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 22),
+              for (final step in steps) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: p.bg,
+                    border: Border.all(color: p.line),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: p.accentSoft,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          step.$1,
+                          style: TextStyle(
+                            color: p.accent,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: LText(step.$2)),
+                    ],
+                  ),
+                ),
+                if (step.$1 != '3') const SizedBox(height: 7),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget stat(BuildContext context, String label, int value) => Container(
     width: 125,
     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

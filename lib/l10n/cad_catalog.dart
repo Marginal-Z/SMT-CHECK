@@ -59,7 +59,16 @@ const cadCatalog = <String, List<String>>{
   "生成 CAD 预览": ["Generate CAD preview", "สร้างตัวอย่าง CAD"],
   "合并与人工确认": ["Merge & review", "รวมและยืนยัน"],
   "CAD 文件名": ["CAD file name", "ชื่อไฟล์ CAD"],
+  "CAD 文件名前缀": ["CAD file name prefix", "คำนำหน้าชื่อไฟล์ CAD"],
   "导出 CAD Excel": ["Export CAD Excel", "ส่งออก CAD Excel"],
+  "导出 {face} CAD 坐标": [
+    "Export {face} CAD coordinates",
+    "ส่งออกพิกัด CAD {face}",
+  ],
+  "保留设备十列格式；分别导出 -TOP-CAD坐标.xlsx 与 -BOT-CAD坐标.xlsx": [
+    "Preserves the device ten-column format; exports -TOP-CAD coordinates.xlsx and -BOT-CAD coordinates.xlsx separately.",
+    "คงรูปแบบสิบคอลัมน์ของเครื่อง และส่งออกไฟล์ -TOP-CAD坐标.xlsx กับ -BOT-CAD坐标.xlsx แยกกัน",
+  ],
   "请先完成核对、人工确认并生成合并预览。": [
     "Complete the check, manual review and merged preview first.",
     "ตรวจสอบ ยืนยันโดยผู้ใช้ และสร้างตัวอย่างไฟล์ที่รวมก่อน",
@@ -119,6 +128,14 @@ const cadCatalog = <String, List<String>>{
   "CAD 文件已导出：{path}": [
     "CAD file exported: {path}",
     "ส่งออกไฟล์ CAD แล้ว: {path}",
+  ],
+  "TOP CAD 文件已导出：{path}": [
+    "TOP CAD file exported: {path}",
+    "ส่งออกไฟล์ CAD TOP แล้ว: {path}",
+  ],
+  "BOT CAD 文件已导出：{path}": [
+    "BOT CAD file exported: {path}",
+    "ส่งออกไฟล์ CAD BOT แล้ว: {path}",
   ],
   "是否覆盖 CAD 文件？": ["Overwrite the CAD file?", "เขียนทับไฟล์ CAD หรือไม่"],
   "CAD 原坐标位号重复：首次位于 {sheet} 第 {row} 行": [

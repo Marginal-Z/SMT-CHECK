@@ -14,7 +14,7 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
-        SmtCheckApp(
+        SmtFusionApp(
           persist: false,
           initialReport: f.check(
             [f.row('ONE', '1', 'R1'), f.row('TWO', '1', 'R2')],
@@ -44,7 +44,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(
-      SmtCheckApp(
+      SmtFusionApp(
         persist: false,
         initialReport: f.check(
           [f.row('COMPACT', '1', 'R1')],
@@ -77,7 +77,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(const SmtCheckApp(persist: false));
+    await tester.pumpWidget(const SmtFusionApp(persist: false));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('open-merge')), findsOneWidget);
     expect(find.byTooltip('AI 分析核对'), findsOneWidget);

@@ -11,6 +11,14 @@ enum CadUnit {
   const CadUnit(this.factor, this.label);
 }
 
+enum CadFace {
+  top('Top', 'TOP'),
+  bottom('Bottom', 'BOT');
+
+  final String layer, fileCode;
+  const CadFace(this.layer, this.fileCode);
+}
+
 class CadIssue {
   final String reason, file, sheet, reference, code;
   final int row;
@@ -142,6 +150,18 @@ class CadPreview {
   });
   List<CadIssue> get errors => issues.where((i) => i.blocking).toList();
   bool get canExport => rows.isNotEmpty && !issues.any((i) => i.blocking);
+
+  CadPreview forFace(CadFace face) => CadPreview(
+    bom: bom,
+    coordinates: coordinates,
+    unit: unit,
+    rows: List.unmodifiable(rows.where((row) => row.source.layer == face.layer)),
+    issues: issues,
+    minY: minY,
+    maxY: maxY,
+    omitted: omitted,
+    noReferenceRows: noReferenceRows,
+  );
 }
 
 class CadGenerator {
@@ -290,20 +310,61 @@ class CadGenerator {
   }
 }
 
-String cadFileName(String input) {
-  final name = input.trim().replaceFirst(
+String suggestedCadFileName(String projectName) {
+  var name = projectName.trim().replaceFirst(
     RegExp(r'\.xlsx$', caseSensitive: false),
     '',
   );
+  name = name
+      .replaceFirst(
+        RegExp(r'[-_](?:BOM[_-]?)?FAI450正确坐标$', caseSensitive: false),
+        '',
+      )
+      .replaceFirst(RegExp(r'[-_]BOM$', caseSensitive: false), '')
+      .replaceFirst(RegExp(r'[-_]CAD坐标$', caseSensitive: false), '');
+  if (name.toUpperCase() == 'SMT-CHECK') name = 'SMT Fusion';
+  if (name.isEmpty) name = 'SMT Fusion';
+  return '$name-CAD坐标';
+}
+
+String cadFileName(String input, CadFace face) {
+  var name = input.trim().replaceFirst(
+    RegExp(r'\.xlsx$', caseSensitive: false),
+    '',
+  );
+  name = name
+      .replaceFirst(
+        RegExp(r'[-_](?:BOM[_-]?)?FAI450正确坐标$', caseSensitive: false),
+        '',
+      )
+      .replaceFirst(RegExp(r'[-_]BOM$', caseSensitive: false), '')
+      .replaceFirst(RegExp(r'[-_](?:TOP|BOT)[-_]CAD坐标$', caseSensitive: false), '')
+      .replaceFirst(RegExp(r'[-_]CAD坐标$', caseSensitive: false), '');
+  if (name.toUpperCase() == 'SMT-CHECK') name = 'SMT Fusion';
   if (name.isEmpty ||
       name.endsWith('.') ||
-      RegExp(r'[<>:"/\\|?*\x00-\x1f]').hasMatch(name) ||
+      RegExp(
+        r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$',
+        caseSensitive: false,
+      ).hasMatch(name) ||
+      RegExp(r'[<>:"/\\|?*\x00-\x1f]').hasMatch(name)) {
+    throw const FormatException('请输入有效文件名，不含路径或特殊字符');
+  }
+  final stem = [
+    name,
+    face.fileCode,
+    'CAD坐标',
+  ].join('-');
+  if (stem.endsWith('.') ||
+      RegExp(r'[<>:"/\\|?*\x00-\x1f]').hasMatch(stem) ||
       RegExp(
         r'^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)',
         caseSensitive: false,
-      ).hasMatch(name)) {
+      ).hasMatch(stem)) {
     throw const FormatException('请输入有效文件名，不含路径或特殊字符');
   }
-  if (name.length > 180) throw const FormatException('文件名过长，请缩短至 180 个字符以内');
-  return '$name.xlsx';
+  if (stem.length > 180) {
+    throw const FormatException('文件名过长，请缩短至 180 个字符以内');
+  }
+  return '$stem.xlsx';
 }

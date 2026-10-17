@@ -41,7 +41,7 @@ void main() {
       csv.indexOf('"PASS","Z-PASS"'),
       lessThan(csv.indexOf('"NG","A-NG"')),
     );
-    await tester.pumpWidget(SmtCheckApp(persist: false, initialReport: report));
+    await tester.pumpWidget(SmtFusionApp(persist: false, initialReport: report));
     await tester.pumpAndSettle();
     expect(
       tester.getTopLeft(find.text('PASS (1)')).dx,

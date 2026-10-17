@@ -34,7 +34,7 @@ import 'ui/coordinate_compare_settings.dart';
 import 'core/coordinate_comparison.dart';
 import 'l10n/localization.dart';
 
-class SmtCheckApp extends StatefulWidget {
+class SmtFusionApp extends StatefulWidget {
   final List<String> arguments;
   final bool persist;
   final bool settingsMigrationFailed;
@@ -62,7 +62,7 @@ class SmtCheckApp extends StatefulWidget {
     int,
   )?
   sourcePlanner;
-  const SmtCheckApp({
+  const SmtFusionApp({
     super.key,
     this.arguments = const [],
     this.persist = true,
@@ -81,10 +81,10 @@ class SmtCheckApp extends StatefulWidget {
     this.sourcePlanner,
   });
   @override
-  State<SmtCheckApp> createState() => _SmtCheckAppState();
+  State<SmtFusionApp> createState() => _SmtFusionAppState();
 }
 
-class _SmtCheckAppState extends State<SmtCheckApp> {
+class _SmtFusionAppState extends State<SmtFusionApp> {
   final messenger = GlobalKey<ScaffoldMessengerState>();
   final navigator = GlobalKey<NavigatorState>();
   final keywordController = TextEditingController();
@@ -96,13 +96,14 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   CheckItem? selected;
   StationMergeSession? mergeSession;
   CheckItem? mergeFocus;
-  final mergeName = TextEditingController(text: 'SMT-CHECK-BOM');
+  final mergeName = TextEditingController(text: 'SMT Fusion-BOM');
   bool mergeExportBusy = false;
   CoordinateImport? cadCoordinates, cadSourceCoordinates;
   CadPreview? cadPreview;
   MergedStationFile? cadSourceBom;
   CadUnit? cadUnit;
-  final cadName = TextEditingController(text: 'SMT-CHECK_FAI450正确坐标');
+  final cadName = TextEditingController(text: 'SMT Fusion-CAD坐标');
+  String cadAutoName = 'SMT Fusion-CAD坐标';
   bool cadBusy = false;
   int cadEpoch = 0;
   String cadError = '', cadStage = '';
@@ -116,8 +117,6 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   int page = 0;
   int settingsSection = 0;
   bool updateDialogOpen = false;
-  bool iconsRepairing = false;
-  String iconsRepairStatus = '';
   int sessionEpoch = 0;
   int aiEpoch = 0, batchLimit = 24000, sourceCompleted = 0, sourceTotal = 0;
   List<SourceAnalysisBatch> sourceBatches = [];
@@ -302,7 +301,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       page = 0;
       invalidateCad(clearCoordinates: true);
       coordinateCompare.clear();
-      cadName.text = 'SMT-CHECK_FAI450正确坐标';
+      cadName.text = 'SMT Fusion-CAD坐标';
+      cadAutoName = cadName.text;
       activity = '已清空，可重新导入文件';
     });
   }
@@ -824,7 +824,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       final location = await getSaveLocation(
         confirmButtonText: translate('保存', language),
         suggestedName:
-            'SMT-CHECK-${snapshot.created.toIso8601String().replaceAll(RegExp(r'[:.]'), '-')}.$ext',
+            'SMT Fusion-${snapshot.created.toIso8601String().replaceAll(RegExp(r'[:.]'), '-')}.$ext',
         acceptedTypeGroups: [
           XTypeGroup(
             label: ext.toUpperCase(),
@@ -879,8 +879,9 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   void openCad() => setState(() {
-    if (cadName.text == 'SMT-CHECK_FAI450正确坐标') {
-      cadName.text = '${mergeName.text}_FAI450正确坐标';
+    if (cadName.text.trim().isEmpty || cadName.text == cadAutoName) {
+      cadName.text = suggestedCadFileName(mergeName.text);
+      cadAutoName = cadName.text;
     }
     page = 5;
   });
@@ -984,9 +985,11 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     }
   }
 
-  Future<void> exportCad() async {
+  Future<void> exportCad(CadFace face) async {
     final snapshot = currentCadPreview, epoch = sessionEpoch, token = cadEpoch;
     if (snapshot == null || !snapshot.canExport || cadBusy) return;
+    final faceSnapshot = snapshot.forFace(face);
+    if (!faceSnapshot.canExport) return;
     bool current() =>
         mounted &&
         epoch == sessionEpoch &&
@@ -998,7 +1001,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     });
     try {
       final location = await getSaveLocation(
-        suggestedName: cadFileName(cadName.text),
+        suggestedName: cadFileName(cadName.text, face),
         confirmButtonText: translate('保存', language),
         acceptedTypeGroups: [
           const XTypeGroup(
@@ -1010,14 +1013,19 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       );
       if (location == null || !current()) return;
       final raw = File(location.path),
-          filename = cadFileName(File(location.path).uri.pathSegments.last);
+          filename = cadFileName(
+            File(location.path).uri.pathSegments.last,
+            face,
+          );
       final target = File(
         '${raw.parent.path}${Platform.pathSeparator}$filename',
       );
-      if (CadWorkbookExport.targetsOriginal(target.path, [
+      final originals = [
         ...?report?.files.map((f) => f.path),
         snapshot.coordinates.path,
-      ])) {
+      ];
+      if (CadWorkbookExport.targetsOriginal(target.path, originals) ||
+          CadWorkbookExport.targetsOriginal(raw.path, originals)) {
         notify('不能覆盖原始文件，请选择其他文件名或目录');
         return;
       }
@@ -1043,20 +1051,25 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
         );
         if (overwrite != true || !current()) return;
       }
-      final bytes = await encodeCadInBackground(snapshot);
+      final bytes = await encodeCadInBackground(faceSnapshot);
       if (!current()) return;
       final temporary = File(
-        '${target.parent.path}${Platform.pathSeparator}.smt-check-cad-${DateTime.now().microsecondsSinceEpoch}.tmp',
+        '${target.parent.path}${Platform.pathSeparator}.smt-fusion-cad-${DateTime.now().microsecondsSinceEpoch}.tmp',
       );
       try {
         await temporary.writeAsBytes(bytes, flush: true);
-        await verifyCadFileInBackground(temporary.path, snapshot);
+        await verifyCadFileInBackground(temporary.path, faceSnapshot);
         if (!current()) return;
         await temporary.rename(target.path);
       } finally {
         if (temporary.existsSync()) await temporary.delete();
       }
-      if (current()) notify('CAD 文件已导出：${target.path}');
+      if (current()) {
+        notify(
+          translate('${face.fileCode} CAD 文件已导出：{path}', language)
+              .replaceAll('{path}', target.path),
+        );
+      }
     } catch (e) {
       if (current()) {
         notify(
@@ -1236,7 +1249,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                 stage: cadStage,
                 onImport: () => unawaited(importCoordinates()),
                 onGenerate: () => unawaited(generateCad()),
-                onExport: () => unawaited(exportCad()),
+                onExport: (face) => unawaited(exportCad(face)),
                 onMerge: openMerge,
                 onUnit: (value) => setState(() {
                   invalidateCad();
@@ -1289,32 +1302,6 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       );
     } finally {
       updateDialogOpen = false;
-    }
-  }
-
-  Future<void> refreshDesktopIcons() async {
-    if (iconsRepairing) return;
-    setState(() {
-      iconsRepairing = true;
-      iconsRepairStatus = '';
-    });
-    try {
-      await repairDesktopIcons();
-      if (mounted) {
-        setState(
-          () => iconsRepairStatus = '已刷新本应用快捷方式和窗口图标；固定图标若仍旧，请取消固定后重新固定。',
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(
-          () => iconsRepairStatus = e is FormatException
-              ? e.message
-              : '部分图标无法刷新，请检查快捷方式权限。',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => iconsRepairing = false);
     }
   }
 
@@ -1624,16 +1611,16 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             onPressed: () => setState(() => settingsSection = 1),
           ),
           DeskButton(
-            '关于与更新',
-            selected: settingsSection == 2,
-            icon: Icons.info_outline,
-            onPressed: () => setState(() => settingsSection = 2),
-          ),
-          DeskButton(
             '坐标比较设置',
             selected: settingsSection == 3,
             icon: Icons.tune,
             onPressed: () => setState(() => settingsSection = 3),
+          ),
+          DeskButton(
+            '关于与更新',
+            selected: settingsSection == 2,
+            icon: Icons.info_outline,
+            onPressed: () => setState(() => settingsSection = 2),
           ),
         ],
       ),
@@ -1669,28 +1656,6 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                   ),
                   const SizedBox(height: 12),
                   caption(context, '在软件内下载并校验安装包，无需打开发布页面。'),
-                  if (Platform.isWindows) ...[
-                    const SizedBox(height: 24),
-                    const Divider(),
-                    const SizedBox(height: 12),
-                    DeskButton(
-                      '刷新桌面图标',
-                      key: const Key('repair-desktop-icons'),
-                      icon: Icons.refresh,
-                      onPressed: iconsRepairing
-                          ? null
-                          : () => unawaited(refreshDesktopIcons()),
-                    ),
-                    const SizedBox(height: 8),
-                    caption(
-                      context,
-                      iconsRepairing
-                          ? '正在刷新图标…'
-                          : iconsRepairStatus.isNotEmpty
-                          ? iconsRepairStatus
-                          : '只刷新 SMT Fusion 的图标关联，不重启资源管理器。',
-                    ),
-                  ],
                 ],
               ),
             ),

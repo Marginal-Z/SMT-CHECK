@@ -58,7 +58,7 @@ Future<void> prepare(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
-    SmtCheckApp(
+    SmtFusionApp(
       persist: false,
       initialReport: report ?? mergeReport(),
       coordinateLoader: loader ?? (p) async => coordinates(p),
@@ -100,13 +100,18 @@ Future<void> ready(WidgetTester tester) async {
 
 // A file can become visible just before rename's Future and the UI completion
 // finish. Allow real I/O and render that final state before settling animations.
-Future<void> exportAndWait(WidgetTester tester, String output) async {
+Future<void> exportAndWait(
+  WidgetTester tester,
+  String output, {
+  String face = 'top',
+}) async {
   await tester.runAsync(() async {
-    await tester.tap(find.byKey(const Key('export-cad')));
+    final key = 'export-cad-$face';
+    await tester.tap(find.byKey(Key(key)));
     for (var i = 0; i < 300; i++) {
       await Future<void>.delayed(const Duration(milliseconds: 20));
       await tester.pump();
-      if (File(output).existsSync() && enabled(tester, 'export-cad')) return;
+      if (File(output).existsSync() && enabled(tester, key)) return;
     }
     fail('CAD export did not finish with the export control re-enabled');
   });
@@ -143,19 +148,20 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('单表 CAD'), findsOneWidget);
       expect(find.text('PASS · 1 个位号'), findsOneWidget);
-      expect(enabled(tester, 'export-cad'), isTrue);
+      expect(enabled(tester, 'export-cad-top'), isFalse);
+      expect(enabled(tester, 'export-cad-bot'), isTrue);
       await tester.tap(find.byTooltip('核对工作台'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('A + B 合并'));
       await tester.pumpAndSettle();
       await openCad(tester);
-      expect(enabled(tester, 'export-cad'), isFalse);
+      expect(enabled(tester, 'export-cad-bot'), isFalse);
     },
   );
   testWidgets('single table PASS flow needs no B file and exports CAD', (
     tester,
   ) async {
-    final target = '${temp.path}/single-CAD.xlsx';
+    final target = '${temp.path}/single-BOT-CAD坐标.xlsx';
     FileSelectorPlatform.instance = CadSelector(
       input,
       save: (_) async => FileSaveLocation(target),
@@ -167,7 +173,7 @@ void main() {
     await selectUnit(tester, '毫米（mm）');
     await tester.tap(find.byKey(const Key('generate-cad')));
     await tester.pumpAndSettle();
-    await exportAndWait(tester, target);
+    await exportAndWait(tester, target, face: 'bot');
     expect(File(target).existsSync(), isTrue);
     expect(CoordinateReader().read(target).records.map((r) => r.reference), [
       'R1',
@@ -186,7 +192,8 @@ void main() {
     expect(enabled(tester, 'generate-cad'), isTrue);
     await tester.tap(find.byKey(const Key('generate-cad')));
     await tester.pumpAndSettle();
-    expect(enabled(tester, 'export-cad'), isTrue);
+    expect(enabled(tester, 'export-cad-top'), isTrue);
+    expect(enabled(tester, 'export-cad-bot'), isTrue);
     expect(find.byKey(const Key('cad-preview-table')), findsOneWidget);
     expect(find.text('PASS · 2 个位号'), findsOneWidget);
   });
@@ -194,9 +201,11 @@ void main() {
     tester,
   ) async {
     await ready(tester);
-    expect(enabled(tester, 'export-cad'), isTrue);
+    expect(enabled(tester, 'export-cad-top'), isTrue);
+    expect(enabled(tester, 'export-cad-bot'), isTrue);
     await selectUnit(tester, '密耳（mil）');
-    expect(enabled(tester, 'export-cad'), isFalse);
+    expect(enabled(tester, 'export-cad-top'), isFalse);
+    expect(enabled(tester, 'export-cad-bot'), isFalse);
     expect(find.byKey(const Key('cad-preview-table')), findsNothing);
     await tester.tap(find.byKey(const Key('generate-cad')));
     await tester.pumpAndSettle();
@@ -208,7 +217,8 @@ void main() {
     await tester.pumpAndSettle();
     await openCad(tester);
     expect(enabled(tester, 'generate-cad'), isFalse);
-    expect(enabled(tester, 'export-cad'), isFalse);
+    expect(enabled(tester, 'export-cad-top'), isFalse);
+    expect(enabled(tester, 'export-cad-bot'), isFalse);
   });
   testWidgets(
     'a coordinate read completing after clear cannot restore stale input',
@@ -225,7 +235,8 @@ void main() {
       await tester.pumpAndSettle();
       await openCad(tester);
       expect(find.text('尚未导入原坐标'), findsOneWidget);
-      expect(enabled(tester, 'export-cad'), isFalse);
+    expect(enabled(tester, 'export-cad-top'), isFalse);
+    expect(enabled(tester, 'export-cad-bot'), isFalse);
     },
   );
   testWidgets('pending save is cancelled by clearing the check session', (
@@ -237,13 +248,13 @@ void main() {
       save: (_) => save.future,
     );
     await ready(tester);
-    await tester.tap(find.byKey(const Key('export-cad')));
+    await tester.tap(find.byKey(const Key('export-cad-top')));
     await tester.pump();
     await tester.tap(find.byTooltip('核对工作台'));
     await tester.pump();
     await tester.tap(find.byKey(const Key('clear-session')));
     await tester.pumpAndSettle();
-    final output = '${temp.path}/stale.xlsx';
+    final output = '${temp.path}/stale-TOP-CAD坐标.xlsx';
     save.complete(FileSaveLocation(output));
     await tester.pumpAndSettle();
     expect(File(output).existsSync(), isFalse);
@@ -254,15 +265,15 @@ void main() {
       save: (_) async => FileSaveLocation(input),
     );
     await ready(tester);
-    await tester.tap(find.byKey(const Key('export-cad')));
+    await tester.tap(find.byKey(const Key('export-cad-top')));
     await tester.pumpAndSettle();
     expect(find.text('不能覆盖原始文件，请选择其他文件名或目录'), findsOneWidget);
     expect(File(input).readAsStringSync(), 'original coordinate bytes');
   });
-  testWidgets('manual CAD filename exports one usable ten-column workbook', (
+  testWidgets('manual CAD filename exports separate usable TOP and BOT files', (
     tester,
   ) async {
-    final output = '${temp.path}/Manual-CAD.xlsx';
+    var output = '${temp.path}/Manual-CAD-TOP-CAD坐标.xlsx';
     final selector = CadSelector(
       input,
       save: (_) async => FileSaveLocation(output),
@@ -274,12 +285,21 @@ void main() {
       'Manual-CAD',
     );
     await exportAndWait(tester, output);
-    expect(selector.suggested, 'Manual-CAD.xlsx');
+    expect(selector.suggested, 'Manual-CAD-TOP-CAD坐标.xlsx');
     expect(File(output).existsSync(), isTrue);
-    final imported = CoordinateReader().read(output);
-    expect(imported.records.map((r) => r.reference), ['R1', 'R2']);
-    expect(imported.records.first.angle, 210);
-    expect(imported.records.first.y, 70);
+    final top = CoordinateReader().read(output);
+    expect(top.records.map((r) => r.reference), ['R2']);
+    expect(top.records.first.angle, 30);
+    expect(top.records.first.y, 40);
+
+    output = '${temp.path}/Manual-CAD-BOT-CAD坐标.xlsx';
+    await exportAndWait(tester, output, face: 'bot');
+    expect(selector.suggested, 'Manual-CAD-BOT-CAD坐标.xlsx');
+    expect(File(output).existsSync(), isTrue);
+    final bottom = CoordinateReader().read(output);
+    expect(bottom.records.map((r) => r.reference), ['R1']);
+    expect(bottom.records.first.angle, 210);
+    expect(bottom.records.first.y, 70);
     expect(File(input).readAsStringSync(), 'original coordinate bytes');
   });
 
@@ -326,7 +346,7 @@ void main() {
                     stage: '',
                     onImport: () {},
                     onGenerate: () {},
-                    onExport: () {},
+                    onExport: (_) {},
                     onMerge: () {},
                     onUnit: (_) {},
                   ),

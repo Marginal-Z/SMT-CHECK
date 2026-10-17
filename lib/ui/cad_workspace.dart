@@ -16,7 +16,8 @@ class CadWorkspace extends StatefulWidget {
   final bool busy, canGenerate, canExport;
   final bool singleStation;
   final String error, stage;
-  final VoidCallback onImport, onGenerate, onExport, onMerge;
+  final VoidCallback onImport, onGenerate, onMerge;
+  final ValueChanged<CadFace> onExport;
   final ValueChanged<CadUnit> onUnit;
   const CadWorkspace({
     super.key,
@@ -57,6 +58,11 @@ class _CadWorkspaceState extends State<CadWorkspace> {
 
   List<CadIssue> get issues =>
       widget.preview?.issues ?? widget.coordinates?.issues ?? const [];
+  bool canExportFace(CadFace face) =>
+      widget.canExport &&
+      !widget.busy &&
+      (widget.preview?.rows.any((row) => row.source.layer == face.layer) ??
+          false);
   @override
   void dispose() {
     horizontal.dispose();
@@ -372,7 +378,7 @@ class _CadWorkspaceState extends State<CadWorkspace> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   LText(
-                    'CAD 文件名',
+                    'CAD 文件名前缀',
                     style: TextStyle(fontSize: 11, color: p.muted),
                   ),
                   const SizedBox(height: 7),
@@ -387,8 +393,7 @@ class _CadWorkspaceState extends State<CadWorkspace> {
                         horizontal: 12,
                         vertical: 12,
                       ),
-                      hintText: 'FAI450-CAD',
-                      suffixText: '.xlsx',
+                      hintText: 'SMT Fusion',
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -397,15 +402,19 @@ class _CadWorkspaceState extends State<CadWorkspace> {
                     runSpacing: 8,
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      DeskButton(
-                        '导出 CAD Excel',
-                        key: const Key('export-cad'),
-                        icon: Icons.download,
-                        onPressed: widget.canExport && !widget.busy
-                            ? widget.onExport
-                            : null,
+                      for (final face in CadFace.values)
+                        DeskButton(
+                          '导出 ${face.fileCode} CAD 坐标',
+                          key: Key('export-cad-${face.fileCode.toLowerCase()}'),
+                          icon: Icons.download,
+                          onPressed: canExportFace(face)
+                              ? () => widget.onExport(face)
+                              : null,
+                        ),
+                      caption(
+                        context,
+                        '保留设备十列格式；分别导出 -TOP-CAD坐标.xlsx 与 -BOT-CAD坐标.xlsx',
                       ),
-                      caption(context, '保留设备十列格式'),
                     ],
                   ),
                 ],

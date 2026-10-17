@@ -64,7 +64,7 @@ Future<void> prepareMerge(
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(
-    SmtCheckApp(
+    SmtFusionApp(
       persist: false,
       initialLanguage: language,
       initialReport: report ?? mergeReport(),

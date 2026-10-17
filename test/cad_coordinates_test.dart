@@ -52,6 +52,45 @@ void main() {
       270,
     );
   });
+  test('face previews split records without changing device transforms', () {
+    final source = CoordinateImport('coords.xlsx', [
+      ...cadCoordinates().records,
+      cadRecord('R2', 20, 40, layer: 'Top', row: 5),
+    ], const []);
+    final preview = CadGenerator.generate(
+      cadBom(positions: 'R1 R2', quantity: '2'),
+      source,
+      CadUnit.mm,
+    );
+    final top = preview.forFace(CadFace.top),
+        bottom = preview.forFace(CadFace.bottom);
+    expect(top.rows.map((row) => row.source.reference), ['R2']);
+    expect(bottom.rows.map((row) => row.source.reference), ['R1']);
+    expect(top.rows.single.cells, [
+      'RES',
+      'R2',
+      'R0402',
+      2,
+      'Top',
+      30.0,
+      20.0,
+      40.0,
+      'Yes',
+      'No',
+    ]);
+    expect(bottom.rows.single.cells, [
+      'RES',
+      'R1',
+      'R0402',
+      2,
+      'Bottom',
+      210.0,
+      10.0,
+      70.0,
+      'Yes',
+      'No',
+    ]);
+  });
   test('units are explicit regardless of coordinate magnitude', () {
     final p = CadGenerator.generate(
       cadBom(),
@@ -280,7 +319,7 @@ void main() {
       expect(sheet, isNot(contains('<f>')));
     },
   );
-  test('export guard protects originals and manual names keep xlsx once', () {
+  test('export guard protects originals and face filenames use CAD suffix', () {
     final original = File('${temp.path}/input.xlsx')
       ..writeAsStringSync('original');
     expect(
@@ -294,10 +333,21 @@ void main() {
       isFalse,
     );
     expect(original.readAsStringSync(), 'original');
-    expect(cadFileName('Order CAD.xlsx'), 'Order CAD.xlsx');
-    expect(cadFileName('Order CAD'), 'Order CAD.xlsx');
+    expect(
+      cadFileName('Order-CAD.xlsx', CadFace.top),
+      'Order-CAD-TOP-CAD坐标.xlsx',
+    );
+    expect(
+      cadFileName('Order-CAD.xlsx', CadFace.bottom),
+      'Order-CAD-BOT-CAD坐标.xlsx',
+    );
+    expect(
+      cadFileName('SMT-CHECK-BOM_FAI450正确坐标.xlsx', CadFace.top),
+      'SMT Fusion-TOP-CAD坐标.xlsx',
+    );
+    expect(suggestedCadFileName('Order-BOM.xlsx'), 'Order-CAD坐标');
     for (final bad in ['', '../input', 'CON', 'name/other', 'name.']) {
-      expect(() => cadFileName(bad), throwsFormatException);
+      expect(() => cadFileName(bad, CadFace.top), throwsFormatException);
     }
   });
 }

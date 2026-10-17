@@ -12,6 +12,6 @@ Future<void> main(List<String> arguments) async {
     migrationFailed = true;
   }
   runApp(
-    SmtCheckApp(arguments: arguments, settingsMigrationFailed: migrationFailed),
+    SmtFusionApp(arguments: arguments, settingsMigrationFailed: migrationFailed),
   );
 }

@@ -1,25 +1,7 @@
-import 'dart:async';
 import 'dart:io';
 
 const officialWebsite =
     'https://marginal-z.github.io/SMT-CHECK';
-
-Future<void> repairDesktopIcons() async {
-  if (!Platform.isWindows) throw const FormatException('此功能仅适用于 Windows。');
-  final process = await Process.start(Platform.resolvedExecutable, [
-    '--repair-icons',
-  ]);
-  unawaited(process.stdout.drain<void>());
-  unawaited(process.stderr.drain<void>());
-  final result = await process.exitCode.timeout(
-    const Duration(seconds: 20),
-    onTimeout: () {
-      process.kill();
-      throw const FormatException('图标刷新超时，请重试。');
-    },
-  );
-  if (result != 0) throw const FormatException('部分图标无法刷新，请检查快捷方式权限。');
-}
 
 Future<void> openDocumentation({
   bool guide = false,

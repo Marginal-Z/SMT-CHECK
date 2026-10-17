@@ -62,7 +62,7 @@ void main() {
         [f.row('PASS', '1', 'R1'), f.row('ERROR', '1', 'C1')],
         [f.row('PASS', '1', 'R1'), f.row('ERROR', '1', 'C2')],
       );
-      await tester.pumpWidget(SmtCheckApp(initialReport: report));
+      await tester.pumpWidget(SmtFusionApp(initialReport: report));
       await tester.pumpAndSettle();
       for (final accent in [ThemeAccent.blue, ThemeAccent.green]) {
         await tester.tap(find.byTooltip('设置'));
@@ -92,7 +92,7 @@ void main() {
         expect(report.count(CheckStatus.error), 1);
       }
       await tester.pumpWidget(const SizedBox());
-      await tester.pumpWidget(SmtCheckApp(initialReport: report));
+      await tester.pumpWidget(SmtFusionApp(initialReport: report));
       await tester.pumpAndSettle();
       expect(
         Theme.of(tester.element(find.byType(Scaffold)))

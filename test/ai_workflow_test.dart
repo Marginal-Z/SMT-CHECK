@@ -76,7 +76,7 @@ Future<void> prepare(
     'aiModel': 'demo',
   });
   await tester.pumpWidget(
-    SmtCheckApp(
+    SmtFusionApp(
       workbookLoader: (_, kind, side) async => f.input(
         [f.row('K1', '1', kind == InputKind.bom ? 'R1' : 'R2')],
         bom: kind == InputKind.bom,

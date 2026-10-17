@@ -1,5 +1,38 @@
 const coordinateCompareCatalog = <String, List<String>>{
   '坐标差异检测': ['Coordinate comparison', 'เปรียบเทียบพิกัด'],
+  '比较设置': ['Comparison settings', 'การตั้งค่าการเปรียบเทียบ'],
+  '准备坐标差异比较': [
+    'Set up a coordinate comparison',
+    'เตรียมการเปรียบเทียบพิกัด',
+  ],
+  '导入两个文件并确认坐标基准后，系统将按 RefDes 匹配元件并生成差异表。': [
+    'Import both files and confirm their coordinate frames. Components will be matched by RefDes and shown in a difference table.',
+    'นำเข้าไฟล์ทั้งสองและยืนยันระบบพิกัด ระบบจะจับคู่อุปกรณ์ตาม RefDes และแสดงตารางความแตกต่าง',
+  ],
+  '分别导入坐标文件 A 和 B': [
+    'Import coordinate files A and B',
+    'นำเข้าไฟล์พิกัด A และ B',
+  ],
+  '坐标文件 A 与 B 已就绪': [
+    'Coordinate files A and B are ready',
+    'ไฟล์พิกัด A และ B พร้อมแล้ว',
+  ],
+  '确认单位、原点、轴方向与镜像规则': [
+    'Confirm units, origin, axis directions and mirror rules',
+    'ยืนยันหน่วย จุดกำเนิด ทิศทางแกน และกฎการกลับภาพ',
+  ],
+  '坐标基准已确认': [
+    'Coordinate frame is confirmed',
+    'ยืนยันระบบพิกัดแล้ว',
+  ],
+  '完成文件与坐标确认后开始比较': [
+    'Finish importing and confirming the coordinate frame before comparing',
+    'นำเข้าไฟล์และยืนยันระบบพิกัดให้เสร็จก่อนเริ่มเปรียบเทียบ',
+  ],
+  '开始比较并查看差异明细': [
+    'Compare files and inspect the differences',
+    'เริ่มเปรียบเทียบและตรวจสอบรายละเอียดความแตกต่าง',
+  ],
   '坐标比较设置损坏，已使用默认值，请重新保存。': [
     'Comparison settings are invalid. Defaults restored; please save again.',
     'การตั้งค่าเปรียบเทียบไม่ถูกต้อง ใช้ค่าเริ่มต้นแล้ว กรุณาบันทึกใหม่',

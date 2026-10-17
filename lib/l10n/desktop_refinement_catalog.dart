@@ -11,20 +11,6 @@ const desktopRefinementCatalog = <String, List<String>>{
   ],
   '访问官网': ['Official website', 'เว็บไซต์ทางการ'],
   '完整使用教程': ['Full user guide', 'คู่มือการใช้งานฉบับเต็ม'],
-  '刷新桌面图标': ['Refresh desktop icons', 'รีเฟรชไอคอนเดสก์ท็อป'],
-  '正在刷新图标…': ['Refreshing icons…', 'กำลังรีเฟรชไอคอน…'],
-  '只刷新 SMT Fusion 的图标关联，不重启资源管理器。': [
-    'Refresh SMT Fusion icon associations without restarting Explorer.',
-    'รีเฟรชการเชื่อมโยงไอคอน SMT Fusion โดยไม่เริ่ม Explorer ใหม่',
-  ],
-  '已刷新本应用快捷方式和窗口图标；固定图标若仍旧，请取消固定后重新固定。': [
-    'App shortcut and window icons refreshed. If an old pinned icon remains, unpin and pin the app again.',
-    'รีเฟรชไอคอนทางลัดและหน้าต่างแล้ว หากไอคอนที่ปักหมุดยังเป็นของเดิม ให้เลิกปักหมุดแล้วปักหมุดใหม่',
-  ],
-  '部分图标无法刷新，请检查快捷方式权限。': [
-    'Some icons could not be refreshed. Check shortcut permissions.',
-    'ไม่สามารถรีเฟรชบางไอคอนได้ โปรดตรวจสอบสิทธิ์ของทางลัด',
-  ],
   '图标刷新超时，请重试。': [
     'Icon refresh timed out. Please retry.',
     'หมดเวลารีเฟรชไอคอน โปรดลองใหม่',

@@ -33,7 +33,7 @@ void main() {
           [fixture.row('K-123', '1', 'R2')],
         );
         await tester.pumpWidget(
-          SmtCheckApp(
+          SmtFusionApp(
             persist: false,
             initialLanguage: language,
             initialReport: report,
@@ -94,7 +94,7 @@ void main() {
         path: 'new.xlsx',
       );
       await tester.pumpWidget(
-        SmtCheckApp(
+        SmtFusionApp(
           persist: false,
           initialReport: report,
           workbookLoader: (_, _, _) async => loaded,
@@ -120,7 +120,7 @@ void main() {
     addTearDown(() => FileSelectorPlatform.instance = original);
     final pending = Completer<ImportedFile>();
     await tester.pumpWidget(
-      SmtCheckApp(persist: false, workbookLoader: (_, _, _) => pending.future),
+      SmtFusionApp(persist: false, workbookLoader: (_, _, _) => pending.future),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('导入 BOM'));
@@ -147,7 +147,7 @@ void main() {
         [fixture.row('KEPT', '1', 'R1')],
         [fixture.row('KEPT', '1', 'R1')],
       );
-      await tester.pumpWidget(SmtCheckApp(initialReport: report));
+      await tester.pumpWidget(SmtFusionApp(initialReport: report));
       await tester.pumpAndSettle();
       for (final language in ['en', 'th', 'zh']) {
         await tester.tap(find.byKey(const Key('language-selector')));

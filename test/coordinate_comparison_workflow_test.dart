@@ -53,6 +53,31 @@ CoordinateCompareController prepared() {
 }
 
 void main() {
+  testWidgets('comparison landing state shows workflow steps without empty filters', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1560, 980);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final c = CoordinateCompareController();
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: desktopTheme(false),
+        home: Scaffold(
+          body: CoordinateComparisonWorkspace(controller: c, onSettings: () {}),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('准备坐标差异比较'), findsOneWidget);
+    expect(find.text('分别导入坐标文件 A 和 B'), findsOneWidget);
+    expect(find.byKey(const Key('coordinate-search')), findsNothing);
+    expect(find.byKey(const Key('coordinate-filter')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('clear rejects a late native file-picker selection', (
     tester,
   ) async {
@@ -314,7 +339,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(const SmtCheckApp(persist: false));
+    await tester.pumpWidget(const SmtFusionApp(persist: false));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('坐标差异检测'));
     await tester.pumpAndSettle();
@@ -373,7 +398,7 @@ void main() {
         'accentColor': 'blue',
         'exclude': false,
       });
-      await tester.pumpWidget(const SmtCheckApp());
+      await tester.pumpWidget(const SmtFusionApp());
       await tester.pumpAndSettle();
       expect(find.byTooltip(translate('坐标差异检测', 'th')), findsOneWidget);
       final theme = Theme.of(tester.element(find.byType(Scaffold).first));

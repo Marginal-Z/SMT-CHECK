@@ -25,7 +25,7 @@ void main() {
             [f.row('PASS', '1', 'R1'), f.row('ERROR', '1', 'C2')],
           );
           await tester.pumpWidget(
-            SmtCheckApp(
+            SmtFusionApp(
               persist: false,
               initialAccent: accent,
               initialReport: report,
@@ -81,7 +81,7 @@ void main() {
           [f.row('PART', '1', 'R1')],
         );
         await tester.pumpWidget(
-          SmtCheckApp(persist: false, initialReport: report),
+          SmtFusionApp(persist: false, initialReport: report),
         );
         await tester.pumpAndSettle();
         await tester.tap(find.text('PART').first);

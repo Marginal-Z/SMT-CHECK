@@ -52,7 +52,7 @@ void main() {
         addTearDown(tester.view.resetDevicePixelRatio);
         final report = sample();
         await tester.pumpWidget(
-          SmtCheckApp(
+          SmtFusionApp(
             persist: false,
             initialLanguage: language,
             initialReport: report,

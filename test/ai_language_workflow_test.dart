@@ -130,7 +130,7 @@ void main() {
       ),
     );
     await tester.pumpWidget(
-      SmtCheckApp(
+      SmtFusionApp(
         initialReport: f.check(
           [f.row('P', '1', 'R1')],
           [f.row('P', '1', 'R2')],

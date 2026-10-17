@@ -46,7 +46,7 @@ void main() {
           addTearDown(tester.view.resetDevicePixelRatio);
           final report = differenceReport();
           await tester.pumpWidget(
-            SmtCheckApp(
+            SmtFusionApp(
               persist: false,
               initialLanguage: language,
               initialReport: report,
@@ -182,7 +182,7 @@ void main() {
         [...base.items.single.smt, f.row('SECOND', '1', 'C2', desc: '电容 20NF')],
       );
       await tester.pumpWidget(
-        SmtCheckApp(persist: false, initialReport: report),
+        SmtFusionApp(persist: false, initialReport: report),
       );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(ObjectKey(report.errors.first)));
