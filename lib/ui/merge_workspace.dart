@@ -67,7 +67,7 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
 
   @override
   Widget build(BuildContext context) {
-    final session = widget.session, p = Palette.of(context);
+    final session = widget.session;
     if (session == null || !session.hasTwoStations) {
       return Pane(
         child: Center(
@@ -99,41 +99,86 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
         ),
       );
     }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          spacing: 16,
-          runSpacing: 10,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            Column(
+    return LayoutBuilder(
+      builder: (context, constraints) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: (constraints.maxHeight - 260).clamp(
+                0.0,
+                constraints.maxHeight,
+              ),
+            ),
+            child: SingleChildScrollView(
+              key: const Key('merge-header-scroll'),
+              child: mergeHeader(context, session),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Expanded(
+            child: showPreview
+                ? preview(context, session)
+                : review(context, session),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget mergeHeader(BuildContext context, StationMergeSession session) =>
+      LayoutBuilder(
+        builder: (context, constraints) {
+          final scale = MediaQuery.textScalerOf(context).scale(12) / 12;
+          final source = sourceControls(context, session, scale);
+          final export = exportControls(context, session, scale);
+          if (constraints.maxWidth >= 1200 * scale) {
+            return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const LText(
-                  'A+B 合并与导出',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 5),
-                caption(context, '仅合并 SMT 站位表原始记录，保留四列；人工确认不改变核对状态。'),
+                Expanded(child: source),
+                const SizedBox(width: 20),
+                SizedBox(width: 440 * scale, child: export),
               ],
-            ),
-            Text(
-              localText(
-                context,
-                '已确认 ${session.confirmedCount} / ${session.requiredItems.length} 项',
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              source,
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: 560 * scale),
+                  child: export,
+                ),
               ),
-              key: const Key('merge-review-count'),
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-                color: session.pendingCount > 0 ? p.alertText : p.text,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Wrap(
+            ],
+          );
+        },
+      );
+
+  Widget sourceControls(
+    BuildContext context,
+    StationMergeSession session,
+    double scale,
+  ) => Column(
+    key: const Key('merge-source-tools'),
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      const LText(
+        'A+B 合并与导出',
+        style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 5),
+      Container(
+        key: const Key('merge-source-description'),
+        child: caption(context, '仅合并 SMT 站位表原始记录，保留四列；人工确认不改变核对状态。'),
+      ),
+      const SizedBox(height: 12),
+      LayoutBuilder(
+        builder: (context, constraints) => Wrap(
           spacing: 8,
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -153,35 +198,67 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
               onPressed: () => setState(() => showPreview = true),
             ),
             SizedBox(
-              width: 206,
-              child: DropdownButtonFormField<MergeMode>(
-                key: ValueKey(mode),
-                initialValue: mode,
-                isExpanded: true,
-                decoration: InputDecoration(
-                  labelText: localText(context, '合并方式'),
+              key: const Key('merge-mode-control'),
+              width: math.min(260 * scale, constraints.maxWidth),
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 40),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 7,
                 ),
-                items: [
-                  for (final value in MergeMode.values)
-                    DropdownMenuItem(
-                      value: value,
-                      child: LText(
-                        value == MergeMode.summarize ? '同料号汇总' : '保留 A+B 明细',
-                        style: const TextStyle(fontSize: 12),
+                decoration: BoxDecoration(
+                  color: Palette.of(context).panel,
+                  border: Border.all(color: Palette.of(context).line),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    LText(
+                      '合并方式',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Palette.of(context).muted,
                       ),
                     ),
-                ],
-                onChanged: widget.busy
-                    ? null
-                    : (value) {
-                        if (value == null || value == mode) return;
-                        session.clearPreview();
-                        setState(() {
-                          mode = value;
-                          error = '';
-                        });
-                        widget.onChanged();
-                      },
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<MergeMode>(
+                          key: ValueKey(mode),
+                          value: mode,
+                          isExpanded: true,
+                          isDense: true,
+                          borderRadius: BorderRadius.circular(6),
+                          items: [
+                            for (final value in MergeMode.values)
+                              DropdownMenuItem(
+                                value: value,
+                                child: LText(
+                                  value == MergeMode.summarize
+                                      ? '同料号汇总'
+                                      : '保留 A+B 明细',
+                                  style: const TextStyle(fontSize: 12),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: widget.busy
+                              ? null
+                              : (value) {
+                                  if (value == null || value == mode) return;
+                                  session.clearPreview();
+                                  setState(() {
+                                    mode = value;
+                                    error = '';
+                                  });
+                                  widget.onChanged();
+                                },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             DeskButton(
@@ -208,59 +285,124 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
             ),
           ],
         ),
-        const SizedBox(height: 9),
-        caption(
-          context,
-          mode == MergeMode.summarize
-              ? '料号、描述均相同且数量有效时汇总；其余保留明细，位号原样拼接，不去重。'
-              : '按 A 表、B 表顺序保留每行原始内容，仅移除人工确认不纳入的 SMT 记录。',
-        ),
-        if (error.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              localText(context, error),
-              style: TextStyle(color: p.alertText),
-            ),
+      ),
+      const SizedBox(height: 9),
+      caption(
+        context,
+        mode == MergeMode.summarize
+            ? '料号、描述均相同且数量有效时汇总；其余保留明细，位号原样拼接，不去重。'
+            : '按 A 表、B 表顺序保留每行原始内容，仅移除人工确认不纳入的 SMT 记录。',
+      ),
+      if (error.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            localText(context, error),
+            style: TextStyle(color: Palette.of(context).alertText),
           ),
-        const SizedBox(height: 10),
-        Expanded(
-          child: showPreview
-              ? preview(context, session)
-              : review(context, session),
         ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 12,
-          runSpacing: 8,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 310,
-              child: TextField(
-                key: const Key('merge-file-name'),
-                controller: widget.nameController,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  labelText: localText(context, '合并文件名'),
-                  helperText: _nameHint(context),
+    ],
+  );
+
+  Widget exportControls(
+    BuildContext context,
+    StationMergeSession session,
+    double scale,
+  ) {
+    final p = Palette.of(context);
+    final metrics = TextPainter(
+      text: TextSpan(
+        text: localText(context, '导出合并 Excel'),
+        style: DefaultTextStyle.of(context).style
+            .copyWith(fontSize: 12, fontWeight: FontWeight.w600),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    final buttonWidth = metrics.width + 51;
+    metrics.dispose();
+    final nameField = TextField(
+      key: const Key('merge-file-name'),
+      controller: widget.nameController,
+      onChanged: (_) => setState(() {}),
+      decoration: InputDecoration(hintText: localText(context, '合并文件名')),
+      style: const TextStyle(fontSize: 12),
+    );
+    final exportButton = DeskButton(
+      '导出合并 Excel',
+      key: const Key('export-merge'),
+      icon: Icons.file_download_outlined,
+      primary: true,
+      onPressed: !session.canExport || widget.busy || !_validName
+          ? null
+          : widget.onExport,
+    );
+    return Pane(
+      key: const Key('merge-export-tools'),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              LText('合并文件名', style: TextStyle(fontSize: 11, color: p.muted)),
+              Text(
+                localText(
+                  context,
+                  '已确认 ${session.confirmedCount} / ${session.requiredItems.length} 项',
                 ),
-                style: const TextStyle(fontSize: 12),
+                key: const Key('merge-review-count'),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: session.pendingCount > 0 ? p.alertText : p.text,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth >= buttonWidth + 8 + 160 * scale) {
+                return Row(
+                  children: [
+                    Expanded(child: nameField),
+                    const SizedBox(width: 8),
+                    exportButton,
+                  ],
+                );
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  nameField,
+                  const SizedBox(height: 8),
+                  Align(alignment: Alignment.centerRight, child: exportButton),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 6),
+          Tooltip(
+            message: _nameHint(context),
+            child: Text(
+              _nameHint(context),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color: _validName ? p.muted : p.alertText,
               ),
             ),
-            DeskButton(
-              '导出合并 Excel',
-              key: const Key('export-merge'),
-              icon: Icons.file_download_outlined,
-              primary: true,
-              onPressed: !session.canExport || widget.busy || !_validName
-                  ? null
-                  : widget.onExport,
-            ),
-            caption(context, '文件名自动以 BOM 结尾，格式为 .xlsx'),
-          ],
-        ),
-      ],
+          ),
+          const SizedBox(height: 3),
+          caption(context, '文件名自动以 BOM 结尾，格式为 .xlsx'),
+        ],
+      ),
     );
   }
 
