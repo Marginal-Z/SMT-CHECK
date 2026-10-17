@@ -66,6 +66,7 @@ void main() {
       MaterialApp(
         theme: desktopTheme(false),
         locale: const Locale('zh'),
+        supportedLocales: const [Locale('zh'), Locale('en'), Locale('th')],
         home: Scaffold(
           body: CoordinateComparisonWorkspace(controller: c, onSettings: () {}),
         ),
