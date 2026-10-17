@@ -65,6 +65,7 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: desktopTheme(false),
+        locale: const Locale('zh'),
         home: Scaffold(
           body: CoordinateComparisonWorkspace(controller: c, onSettings: () {}),
         ),
