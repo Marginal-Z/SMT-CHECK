@@ -162,7 +162,7 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(find.byKey(const Key('brand-icon')), findsNothing);
-          expect(find.text('SMT Fusion'), findsNothing);
+          expect(find.text('SMT Fusion'), findsOneWidget);
           await openUpdateSettings(tester, language);
           expect(
             find.text(translate('发现新版本 1.13.0', language)),
