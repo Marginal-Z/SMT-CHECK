@@ -67,6 +67,11 @@ void main() {
         theme: desktopTheme(false),
         locale: const Locale('zh'),
         supportedLocales: const [Locale('zh'), Locale('en'), Locale('th')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         home: Scaffold(
           body: CoordinateComparisonWorkspace(controller: c, onSettings: () {}),
         ),
