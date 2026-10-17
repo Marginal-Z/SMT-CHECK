@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 const officialWebsite =
-    'https://smt-fusion-desktop.yy19273767397472432.chatgpt.site';
+    'https://marginal-z.github.io/SMT-CHECK';
 
 Future<void> repairDesktopIcons() async {
   if (!Platform.isWindows) throw const FormatException('此功能仅适用于 Windows。');
