@@ -9,8 +9,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/models.dart';
+import 'core/cad_coordinates.dart';
 import 'core/station_merge.dart';
 import 'services/background_tasks.dart';
+import 'services/cad_workbook_export.dart';
 import 'services/ai_service.dart';
 import 'services/ai_findings.dart';
 import 'services/report_export.dart';
@@ -23,6 +25,7 @@ import 'ui/desktop_shell.dart';
 import 'ui/ai_views.dart';
 import 'ui/update_dialog.dart';
 import 'ui/merge_workspace.dart';
+import 'ui/cad_workspace.dart';
 import 'l10n/localization.dart';
 
 class SmtCheckApp extends StatefulWidget {
@@ -33,6 +36,13 @@ class SmtCheckApp extends StatefulWidget {
   final ThemeAccent initialAccent;
   final Future<ImportedFile> Function(String, InputKind, String)?
   workbookLoader;
+  final Future<CoordinateImport> Function(String)? coordinateLoader;
+  final Future<CadPreview> Function(
+    MergedStationFile,
+    CoordinateImport,
+    CadUnit,
+  )?
+  cadPlanner;
   final AiService Function()? aiServiceFactory;
   final UpdateService Function()? updateServiceFactory;
   final Future<String> Function()? installedVersionLoader;
@@ -52,6 +62,8 @@ class SmtCheckApp extends StatefulWidget {
     this.initialLanguage = 'zh',
     this.initialAccent = ThemeAccent.black,
     this.workbookLoader,
+    this.coordinateLoader,
+    this.cadPlanner,
     this.aiServiceFactory,
     this.updateServiceFactory,
     this.installedVersionLoader,
@@ -76,6 +88,14 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   CheckItem? mergeFocus;
   final mergeName = TextEditingController(text: 'SMT-CHECK-BOM');
   bool mergeExportBusy = false;
+  CoordinateImport? cadCoordinates, cadSourceCoordinates;
+  CadPreview? cadPreview;
+  MergedStationFile? cadSourceBom;
+  CadUnit? cadUnit;
+  final cadName = TextEditingController(text: 'SMT-CHECK_FAI450正确坐标');
+  bool cadBusy = false;
+  int cadEpoch = 0;
+  String cadError = '', cadStage = '';
   var rules = const CheckRules();
   bool dark = false,
       merged = true,
@@ -188,6 +208,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     model.dispose();
     apiKey.dispose();
     mergeName.dispose();
+    cadName.dispose();
     super.dispose();
   }
 
@@ -201,6 +222,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   void invalidate() {
+    invalidateCad();
     stopAi();
     report = null;
     selected = null;
@@ -233,6 +255,8 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       aiBusy = false;
       invalidate();
       page = 0;
+      invalidateCad(clearCoordinates: true);
+      cadName.text = 'SMT-CHECK_FAI450正确坐标';
       activity = '已清空，可重新导入文件';
     });
   }
@@ -256,6 +280,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   Future<void> loadPath(String path, int slot) async {
+    if (cadBusy || mergeExportBusy) return;
     final epoch = sessionEpoch;
     setState(() {
       busy = true;
@@ -298,6 +323,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   Future<void> pick(int slot) async {
+    if (cadBusy || mergeExportBusy) return;
     try {
       final file = await openFile(
         confirmButtonText: translate('导入', language),
@@ -316,7 +342,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   Future<void> runCheck() async {
-    if (busy || aiBusy) return;
+    if (busy || aiBusy || cadBusy) return;
     final epoch = sessionEpoch;
     if (bom == null || a == null || (merged && b == null)) {
       notify(merged ? '请先导入 BOM、站位表 A 和 B' : '请先导入 BOM 和一份站位表');
@@ -336,6 +362,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       setState(() {
         report = result;
         mergeSession = StationMergeSession(result);
+        invalidateCad();
         mergeFocus = null;
         selected = null;
         aiText = '';
@@ -598,7 +625,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   }
 
   Future<void> analyzeSources({bool resume = false}) async {
-    if (busy || aiBusy) return;
+    if (busy || aiBusy || cadBusy) return;
     if (!sourcesReady) {
       notify(merged ? '请先导入 BOM、站位表 A 和 B' : '请先导入 BOM 和一份站位表');
       return;
@@ -782,6 +809,220 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     page = 4;
   });
 
+  CadPreview? get currentCadPreview {
+    final preview = cadPreview;
+    return mergeSession?.canExport == true &&
+            identical(mergeSession?.preview, cadSourceBom) &&
+            identical(cadCoordinates, cadSourceCoordinates) &&
+            preview?.unit == cadUnit
+        ? preview
+        : null;
+  }
+
+  void invalidateCad({bool clearCoordinates = false}) {
+    cadEpoch++;
+    cadPreview = null;
+    cadSourceBom = null;
+    cadSourceCoordinates = null;
+    cadError = '';
+    cadBusy = false;
+    if (clearCoordinates) {
+      cadCoordinates = null;
+      cadUnit = null;
+    }
+  }
+
+  void openCad() => setState(() {
+    if (cadName.text == 'SMT-CHECK_FAI450正确坐标') {
+      cadName.text = '${mergeName.text}_FAI450正确坐标';
+    }
+    page = 5;
+  });
+
+  Future<void> importCoordinates() async {
+    final epoch = sessionEpoch;
+    try {
+      final file = await openFile(
+        confirmButtonText: translate('导入原坐标', language),
+        acceptedTypeGroups: [
+          const XTypeGroup(
+            label: 'CAD (.xlsx / .csv / .txt)',
+            extensions: ['xlsx', 'csv', 'txt'],
+          ),
+        ],
+      );
+      if (file == null || !mounted || epoch != sessionEpoch) return;
+      final token = ++cadEpoch;
+      setState(() {
+        cadBusy = true;
+        cadStage = '正在读取原坐标…';
+        cadCoordinates = null;
+        cadUnit = null;
+        cadPreview = null;
+        cadError = '';
+      });
+      try {
+        final imported =
+            await (widget.coordinateLoader ?? readCoordinatesInBackground)(
+              file.path,
+            );
+        if (!mounted || epoch != sessionEpoch || token != cadEpoch) return;
+        setState(() {
+          cadCoordinates = imported;
+          cadUnit = imported.unitHint;
+        });
+      } catch (e) {
+        if (mounted && epoch == sessionEpoch && token == cadEpoch) {
+          setState(
+            () => cadError = 'CAD 导入失败：${e is FormatException ? e.message : e}',
+          );
+        }
+      } finally {
+        if (mounted && epoch == sessionEpoch && token == cadEpoch) {
+          setState(() => cadBusy = false);
+        }
+      }
+    } catch (e) {
+      if (mounted && epoch == sessionEpoch) {
+        setState(() => cadError = 'CAD 导入失败：$e');
+      }
+    }
+  }
+
+  Future<void> generateCad() async {
+    final session = mergeSession, coordinates = cadCoordinates, unit = cadUnit;
+    if (session?.canExport != true ||
+        coordinates == null ||
+        unit == null ||
+        cadBusy ||
+        busy ||
+        aiBusy ||
+        cadBusy) {
+      return;
+    }
+    final source = session!.preview!, epoch = sessionEpoch, token = ++cadEpoch;
+    setState(() {
+      cadBusy = true;
+      cadStage = '正在生成 CAD 坐标…';
+      cadPreview = null;
+      cadError = '';
+    });
+    try {
+      final result = await (widget.cadPlanner ?? generateCadInBackground)(
+        source,
+        coordinates,
+        unit,
+      );
+      if (!mounted ||
+          epoch != sessionEpoch ||
+          token != cadEpoch ||
+          !identical(mergeSession?.preview, source) ||
+          session.canExport != true) {
+        return;
+      }
+      setState(() {
+        cadPreview = result;
+        cadSourceBom = source;
+        cadSourceCoordinates = coordinates;
+      });
+    } catch (e) {
+      if (mounted && epoch == sessionEpoch && token == cadEpoch) {
+        setState(
+          () => cadError = 'CAD 生成失败：${e is FormatException ? e.message : e}',
+        );
+      }
+    } finally {
+      if (mounted && epoch == sessionEpoch && token == cadEpoch) {
+        setState(() => cadBusy = false);
+      }
+    }
+  }
+
+  Future<void> exportCad() async {
+    final snapshot = currentCadPreview, epoch = sessionEpoch, token = cadEpoch;
+    if (snapshot == null || !snapshot.canExport || cadBusy) return;
+    bool current() =>
+        mounted &&
+        epoch == sessionEpoch &&
+        token == cadEpoch &&
+        identical(currentCadPreview, snapshot);
+    setState(() {
+      cadBusy = true;
+      cadStage = '正在导出 CAD 坐标…';
+    });
+    try {
+      final location = await getSaveLocation(
+        suggestedName: cadFileName(cadName.text),
+        confirmButtonText: translate('保存', language),
+        acceptedTypeGroups: [
+          const XTypeGroup(
+            label: 'Excel (.xlsx)',
+            extensions: ['xlsx'],
+            uniformTypeIdentifiers: ['org.openxmlformats.spreadsheetml.sheet'],
+          ),
+        ],
+      );
+      if (location == null || !current()) return;
+      final raw = File(location.path),
+          filename = cadFileName(File(location.path).uri.pathSegments.last);
+      final target = File(
+        '${raw.parent.path}${Platform.pathSeparator}$filename',
+      );
+      if (CadWorkbookExport.targetsOriginal(target.path, [
+        ...?report?.files.map((f) => f.path),
+        snapshot.coordinates.path,
+      ])) {
+        notify('不能覆盖原始文件，请选择其他文件名或目录');
+        return;
+      }
+      if (target.existsSync() && target.path != raw.path) {
+        final overwrite = await showDialog<bool>(
+          context: navigator.currentContext!,
+          builder: (context) => AlertDialog(
+            title: const LText('文件已存在'),
+            content: Text(
+              '${localText(context, '是否覆盖 CAD 文件？')}\n${target.path}',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const LText('取消'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const LText('覆盖'),
+              ),
+            ],
+          ),
+        );
+        if (overwrite != true || !current()) return;
+      }
+      final bytes = await encodeCadInBackground(snapshot);
+      if (!current()) return;
+      final temporary = File(
+        '${target.parent.path}${Platform.pathSeparator}.smt-check-cad-${DateTime.now().microsecondsSinceEpoch}.tmp',
+      );
+      try {
+        await temporary.writeAsBytes(bytes, flush: true);
+        if (!current()) return;
+        await temporary.rename(target.path);
+      } finally {
+        if (temporary.existsSync()) await temporary.delete();
+      }
+      if (current()) notify('CAD 文件已导出：${target.path}');
+    } catch (e) {
+      if (current()) {
+        notify(
+          'CAD 导出失败：${e is FormatException ? translate(e.message, language) : e}',
+        );
+      }
+    } finally {
+      if (mounted && epoch == sessionEpoch && token == cadEpoch) {
+        setState(() => cadBusy = false);
+      }
+    }
+  }
+
   Future<void> exportMerged() async {
     final session = mergeSession, epoch = sessionEpoch;
     if (session == null || !session.canExport || mergeExportBusy) return;
@@ -897,9 +1138,15 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             language: language,
             activity: activity,
             dark: dark,
-            busy: busy || aiBusy || mergeExportBusy,
+            busy: busy || aiBusy || cadBusy || mergeExportBusy,
             hasError: error.isNotEmpty,
-            onPage: (value) => setState(() => page = value),
+            onPage: (value) {
+              if (value == 5) {
+                openCad();
+              } else {
+                setState(() => page = value);
+              }
+            },
             onLanguage: (value) => unawaited(changeLanguage(value)),
             onTheme: () {
               setState(() => dark = !dark);
@@ -909,13 +1156,39 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
               0 => workspace(context),
               1 => aiPage(context),
               2 => settingsPage(context),
+              5 => CadWorkspace(
+                bom: mergeSession?.canExport == true
+                    ? mergeSession?.preview
+                    : null,
+                coordinates: cadCoordinates,
+                preview: currentCadPreview,
+                unit: cadUnit,
+                nameController: cadName,
+                busy: busy || aiBusy || cadBusy || mergeExportBusy,
+                canGenerate:
+                    mergeSession?.canExport == true &&
+                    cadCoordinates != null &&
+                    cadUnit != null,
+                canExport: currentCadPreview?.canExport == true,
+                singleStation: report?.merged == false,
+                error: cadError,
+                stage: cadStage,
+                onImport: () => unawaited(importCoordinates()),
+                onGenerate: () => unawaited(generateCad()),
+                onExport: () => unawaited(exportCad()),
+                onMerge: openMerge,
+                onUnit: (value) => setState(() {
+                  invalidateCad();
+                  cadUnit = value;
+                }),
+              ),
               4 => MergeWorkspace(
                 key: ValueKey(mergeSession),
                 session: mergeSession,
                 initialItem: mergeFocus,
                 nameController: mergeName,
-                busy: busy || aiBusy || mergeExportBusy,
-                onChanged: () => setState(() {}),
+                busy: busy || aiBusy || cadBusy || mergeExportBusy,
+                onChanged: () => setState(() => invalidateCad()),
                 onExport: exportMerged,
                 onWorkbench: () => setState(() => page = 0),
               ),
@@ -973,7 +1246,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                       busy ? '处理中…' : '开始核对',
                       primary: true,
                       icon: Icons.play_arrow,
-                      onPressed: busy || aiBusy || !settingsLoaded
+                      onPressed: busy || aiBusy || cadBusy || !settingsLoaded
                           ? null
                           : runCheck,
                     ),
@@ -981,14 +1254,16 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                       '原始文件 AI 核对',
                       variant: DeskButtonVariant.quiet,
                       icon: Icons.auto_awesome_outlined,
-                      onPressed: busy || aiBusy ? null : analyzeSources,
+                      onPressed: busy || aiBusy || cadBusy
+                          ? null
+                          : analyzeSources,
                     ),
                     DeskButton(
                       '合并与导出',
                       key: const Key('open-merge'),
                       icon: Icons.merge_type,
                       variant: DeskButtonVariant.quiet,
-                      onPressed: busy || aiBusy ? null : openMerge,
+                      onPressed: busy || aiBusy || cadBusy ? null : openMerge,
                     ),
                     DeskButton(
                       '清空重来',
@@ -1041,7 +1316,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                   onSelect: (i) => setState(() => selected = i),
                   onAi: aiBusy ? null : (item) => askAi(item: item),
                   onExport: (json) => export(json),
-                  onReview: mergeSession?.hasTwoStations == true
+                  onReview: mergeSession?.hasStationInput == true
                       ? openMerge
                       : null,
                   reviewFor: (item) => mergeSession?.reviewFor(item),
@@ -1363,6 +1638,10 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
             (
               '导出与 AI',
               'CSV 可由 Excel 打开，JSON 保留来源和规则。在设置中配置 AI 接口，可选择原始文件核对或本地异常解读。确认发送范围后才发送提取的原文或异常证据；无需 AI 也能完成本地核对。',
+            ),
+            (
+              'CAD 坐标',
+              '先完成单表或 A+B 核对、人工确认及 BOM 预览，再导入原坐标并选择单位。生成 CAD 预览后可自定义名称导出十列 Excel；Bottom 已按 V1.6 规则预镜像，导入设备时不要二次镜像。',
             ),
             (
               '快捷键',

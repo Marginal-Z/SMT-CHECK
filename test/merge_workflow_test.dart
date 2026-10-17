@@ -106,7 +106,7 @@ void main() {
       await tester.tap(find.byTooltip('合并与导出'));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('export-merge')), findsNothing);
-      expect(find.text('请先导入 BOM、站位表 A 和 B，并以 A+B 合并模式完成核对。'), findsOneWidget);
+      expect(find.text('请先导入 BOM 和站位表，完成单表或 A+B 核对。'), findsOneWidget);
     });
   }
 
@@ -204,7 +204,7 @@ void main() {
       expect(find.byKey(const Key('export-merge')), findsNothing);
       expect(
         find.text(
-          'Import BOM and placement tables A and B, then complete an A+B check.',
+          'Import BOM and placement data, then complete a single-table or A+B check.',
         ),
         findsOneWidget,
       );

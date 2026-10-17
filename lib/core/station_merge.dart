@@ -54,7 +54,10 @@ class StationMergeSession {
   bool get hasTwoStations =>
       report.merged &&
       report.files.where((f) => f.kind == InputKind.station).length == 2;
-  bool get canGenerate => hasTwoStations && pendingCount == 0;
+  bool get hasStationInput =>
+      report.files.where((f) => f.kind == InputKind.station).length ==
+      (report.merged ? 2 : 1);
+  bool get canGenerate => hasStationInput && pendingCount == 0;
   bool get canExport =>
       canGenerate && preview != null && preview!.revision == _revision;
 
@@ -79,7 +82,7 @@ class StationMergeSession {
   void clearPreview() => _invalidate();
 
   MergedStationFile generate(MergeMode mode) {
-    if (!hasTwoStations) throw StateError('请先以 A+B 合并模式完成核对');
+    if (!hasStationInput) throw StateError('请先完成单站位表或 A+B 核对');
     if (pendingCount != 0) throw StateError('请先逐项确认 NG、已排除物料和候选料');
     final decisions = <MaterialRow, bool>{};
     for (final item in report.items) {

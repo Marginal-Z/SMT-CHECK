@@ -11,6 +11,9 @@ include: package:flutter_lints/flutter.yaml
 
 analyzer:
   exclude:
+    - outputs/**
+    - dist/**
+    - .tools/**
     - build/**
     - windows/**
     - macos/**

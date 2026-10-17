@@ -55,3 +55,44 @@ CheckReport mergeReport() {
     ],
   );
 }
+
+CheckReport singleReport({bool allPass = false}) {
+  final pass = sourceRow('00123', '1', 'R1');
+  final ng = sourceRow('NG', '2', 'C1', line: 3);
+  final excluded = sourceRow('PASTE', '.5', '', description: '锡膏', line: 4);
+  final candidate = sourceRow('ALT', '', '', line: 5);
+  final rows = [
+    pass,
+    if (!allPass) ...[ng, excluded, candidate],
+  ];
+  CheckItem item(CheckStatus status, MaterialRow row) => CheckItem(
+    part: row.part,
+    status: status,
+    bom: [],
+    smt: [row],
+    reasons: ['复核'],
+  );
+  return CheckReport(
+    [
+      item(CheckStatus.pass, pass),
+      if (!allPass) ...[
+        item(CheckStatus.error, ng),
+        item(CheckStatus.excluded, excluded),
+        item(CheckStatus.candidate, candidate),
+        CheckItem(
+          part: 'OTHER-SIDE',
+          status: CheckStatus.error,
+          bom: [sourceRow('OTHER-SIDE', '1', 'U1')],
+          smt: [],
+          reasons: ['另一面未覆盖'],
+        ),
+      ],
+    ],
+    const CheckRules(),
+    false,
+    [
+      const ImportedFile('BOM.xlsx', InputKind.bom, [], [], []),
+      ImportedFile('A.xlsx', InputKind.station, rows, [], []),
+    ],
+  );
+}

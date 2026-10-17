@@ -36,6 +36,27 @@ StationMergeSession passSession(List<MaterialRow> a, List<MaterialRow> b) =>
     );
 
 void main() {
+  test('single station preserves reviewed source coverage and cannot invent other-side rows', () {
+    final report = singleReport(),
+        session = StationMergeSession(singleReport());
+    expect(session.hasStationInput, isTrue);
+    expect(session.pendingCount, 4);
+    expect(() => session.generate(MergeMode.details), throwsStateError);
+    for (final item in session.requiredItems) {
+      session.confirm(item, include: false);
+    }
+    final preview = session.generate(MergeMode.details);
+    expect(preview.rows.single.positions, 'R1');
+    expect(preview.includedSourceRows, 1);
+    expect(preview.omittedSourceRows, 3);
+    expect(session.canExport, isTrue);
+    expect(
+      session.report.items.map((i) => i.status),
+      report.items.map((i) => i.status),
+    );
+    session.revoke(session.requiredItems.first);
+    expect(session.canExport, isFalse);
+  });
   test(
     'background check preserves source identity for safe merged export',
     () async {

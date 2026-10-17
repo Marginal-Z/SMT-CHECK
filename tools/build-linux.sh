@@ -27,7 +27,10 @@ while IFS= read -r -d '' library; do
   readelf -h "$library" | grep -F "$elf_machine"
 done < <(find "$destination/lib" -name '*.so' -print0)
 version="$(sed -n 's/^version: *\([^+ ]*\).*/\1/p' pubspec.yaml)"
-package_root="$(mktemp -d "$task_root/dist/deb-stage.XXXXXX")"
+# WSL-mounted Windows folders may report mode 0777 despite chmod. Stage the
+# package on Linux's temporary filesystem so dpkg receives real Unix modes.
+package_root="$(mktemp -d "${TMPDIR:-/tmp}/smt-check-deb.XXXXXX")"
+trap 'rm -rf -- "$package_root"' EXIT
 mkdir -p "$package_root/DEBIAN" "$package_root/opt/smt-check" "$package_root/usr/bin" "$package_root/usr/share/applications" "$package_root/usr/share/icons/hicolor/256x256/apps"
 cp -a "$destination/." "$package_root/opt/smt-check/"
 cp "$task_root/docs/app-icon.png" "$package_root/usr/share/icons/hicolor/256x256/apps/smt-check.png"

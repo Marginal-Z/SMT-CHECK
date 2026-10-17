@@ -68,7 +68,7 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    if (session == null || !session.hasTwoStations) {
+    if (session == null || !session.hasStationInput) {
       return Pane(
         child: Center(
           child: SingleChildScrollView(
@@ -85,7 +85,7 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
                     style: TextStyle(fontSize: 23, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 12),
-                  caption(context, '请先导入 BOM、站位表 A 和 B，并以 A+B 合并模式完成核对。'),
+                  caption(context, '请先导入 BOM 和站位表，完成单表或 A+B 核对。'),
                   const SizedBox(height: 18),
                   DeskButton(
                     '返回核对工作台',
@@ -167,14 +167,19 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
     key: const Key('merge-source-tools'),
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const LText(
-        'A+B 合并与导出',
-        style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
+      LText(
+        session.report.merged ? 'A+B 合并与导出' : '单站位表整理与导出',
+        style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
       ),
       const SizedBox(height: 5),
       Container(
         key: const Key('merge-source-description'),
-        child: caption(context, '仅合并 SMT 站位表原始记录，保留四列；人工确认不改变核对状态。'),
+        child: caption(
+          context,
+          session.report.merged
+              ? '仅合并 SMT 站位表原始记录，保留四列；人工确认不改变核对状态。'
+              : '仅整理当前 SMT 站位表原始记录，保留四列；人工确认不改变核对状态。',
+        ),
       ),
       const SizedBox(height: 12),
       LayoutBuilder(
@@ -191,7 +196,7 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
               onPressed: () => setState(() => showPreview = false),
             ),
             DeskButton(
-              '合并文件预览',
+              session.report.merged ? '合并文件预览' : 'BOM 文件预览',
               key: const Key('merge-preview-tab'),
               selected: showPreview,
               icon: Icons.table_view_outlined,
@@ -236,7 +241,9 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
                                 child: LText(
                                   value == MergeMode.summarize
                                       ? '同料号汇总'
-                                      : '保留 A+B 明细',
+                                      : (session.report.merged
+                                            ? '保留 A+B 明细'
+                                            : '保留原始明细'),
                                   style: const TextStyle(fontSize: 12),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -262,7 +269,7 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
               ),
             ),
             DeskButton(
-              '生成合并预览',
+              session.report.merged ? '生成合并预览' : '生成 BOM 预览',
               key: const Key('generate-merge'),
               primary: true,
               icon: Icons.merge_type,
@@ -312,7 +319,10 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
     final p = Palette.of(context);
     final metrics = TextPainter(
       text: TextSpan(
-        text: localText(context, '导出合并 Excel'),
+        text: localText(
+          context,
+          session.report.merged ? '导出合并 Excel' : '导出 BOM Excel',
+        ),
         style: DefaultTextStyle.of(context).style
             .copyWith(fontSize: 12, fontWeight: FontWeight.w600),
       ),
@@ -329,7 +339,7 @@ class _MergeWorkspaceState extends State<MergeWorkspace> {
       style: const TextStyle(fontSize: 12),
     );
     final exportButton = DeskButton(
-      '导出合并 Excel',
+      session.report.merged ? '导出合并 Excel' : '导出 BOM Excel',
       key: const Key('export-merge'),
       icon: Icons.file_download_outlined,
       primary: true,

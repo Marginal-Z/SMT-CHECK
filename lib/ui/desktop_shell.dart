@@ -5,7 +5,7 @@ import '../l10n/localization.dart';
 import 'design.dart';
 import 'localized_text.dart';
 
-const desktopPages = ['核对工作台', 'AI 分析核对', '设置', '使用说明', '合并与导出'];
+const desktopPages = ['核对工作台', 'AI 分析核对', '设置', '使用说明', '合并与导出', 'CAD 坐标'];
 
 class DesktopShell extends StatelessWidget {
   final int page;
@@ -50,7 +50,7 @@ class DesktopShell extends StatelessWidget {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          for (final i in [0, 4, 1, 2, 3])
+                          for (final i in [0, 4, 5, 1, 2, 3])
                             Tooltip(
                               message: localText(context, desktopPages[i]),
                               child: Semantics(
@@ -89,6 +89,7 @@ class DesktopShell extends StatelessWidget {
                                             Icons.settings_outlined,
                                             Icons.help_outline,
                                             Icons.merge_type,
+                                            Icons.transform,
                                           ][i],
                                           size: 17,
                                         ),
@@ -184,7 +185,7 @@ class DesktopShell extends StatelessWidget {
                     ),
                   ),
                   const Text(
-                    'SMT-CHECK 1.10.1',
+                    'SMT-CHECK 1.11.0',
                     style: TextStyle(fontSize: 10),
                   ),
                 ],
