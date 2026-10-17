@@ -42,7 +42,7 @@ Section: utils
 Priority: optional
 Architecture: $deb_arch
 Maintainer: Marginal-Z <289210392+Marginal-Z@users.noreply.github.com>
-Depends: libgtk-3-0 (>= 3.22), libstdc++6, libglib2.0-0, libc6 (>= 2.35), libegl1, libgles2
+Depends: libgtk-3-0 (>= 3.22), libstdc++6, libglib2.0-0, libc6 (>= 2.35), libegl1, libgles2, policykit-1
 Homepage: https://github.com/Marginal-Z/SMT-CHECK
 Description: T100 BOM and SMT placement reconciliation desktop application
  Bidirectional material checking with Chinese, English and Thai interfaces.
@@ -50,7 +50,7 @@ EOF
 cat > "$package_root/usr/share/applications/smt-check.desktop" <<'EOF'
 [Desktop Entry]
 Type=Application
-Name=SMT-CHECK
+Name=SMT Fusion
 Comment=T100 BOM and SMT material checking
 Exec=/opt/smt-check/SMT-CHECK
 Icon=smt-check

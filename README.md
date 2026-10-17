@@ -1,8 +1,10 @@
-# SMT-CHECK
+# SMT Fusion
 
 [![Windows and Linux builds](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml/badge.svg)](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml)
 
 用于 T100-BOM 与 SMT 站位表原始 `.xlsx` 的双向核对桌面应用。使用 Flutter / Dart，提供 Windows、macOS、Linux 运行器。界面采用顶部功能菜单、紧凑文件栏、大面积数据表及可收起的右侧证据详情，默认浅色和黑色主题色，可选蓝色或绿色，支持深色；禁用 Material 3，界面不使用渐变或紫色。
+
+应用显示名称现为 **SMT Fusion**。仓库地址、应用标识、旧安装路径和兼容下载文件名保留 SMT-CHECK，以支持旧版原位升级；Windows/macOS 自动迁移旧设置。`SMT-Fusion-macos-universal.pkg` 提供 macOS 原生安装与应用内更新。
 
 ## 功能
 
@@ -16,7 +18,7 @@
 - NG、已排除物料和候选料逐项人工选择“确认纳入合并 / 确认不纳入合并”；全部确认后才能生成预览和导出。确认记录显示时间，原核对类别及统计保持不变。只有 BOM 记录的异常需确认知悉，不补造 SMT 内容；PASS 自动纳入。撤销确认、重新核对、更改模式、文件或规则都会使旧预览失效。
 - 合并提供“同料号汇总 / 保留 A+B 明细”。汇总仅合并料号、描述完全一致且数量有效的记录，数量使用十进制精确累加，位号原样拼接并保留重复；其余保留明细。预览可悬停查看来源，导出保留前导零及原始文本，不执行公式，不覆盖原始 Excel。
 - 保留系统窗口标题栏的应用图标与名称，内容区直接显示导航，避免重复标识。
-- “设置 → 关于与更新 → 检查更新”手动查询 GitHub 最新正式版本，显示当前版本、更新说明及 按操作系统及当前程序架构匹配的 Windows / Linux / macOS 安装包下载入口。版本从已安装程序读取；超时、网络错误及 GitHub 限流均可重试，不会误报已是最新。使用系统浏览器下载完整安装包，不会发送 Excel、AI 配置或密钥。
+- “设置 → 关于与更新 → 检查更新”手动查询 GitHub 最新正式版本，显示当前版本、更新说明及 按操作系统及当前程序架构匹配的 Windows / Linux / macOS 安装包下载入口。版本从已安装程序读取；超时、网络错误及 GitHub 限流均可重试，不会误报已是最新。直接在软件内下载并显示真实进度，支持取消和重试；校验文件大小及 SHA-256 后，使用系统安装器安装并重新启动，无需打开发布页。安装前应先导出需要保留的结果；后台核对、分析或导出运行中会阻止安装。不会发送 Excel、AI 配置或密钥。旧版首次需安装此次新版本，之后可使用应用内更新。
 - 自动定位工作表和四个必需表头，保持原文件只读。
 - 字段对应：料件编号 ↔ 料号，品名 ↔ 物料描述，组成用量 ↔ 数量，插件位置 ↔ 位号。
 - 同料号跨行、跨面汇总，双向报告缺料、多料、描述差异、数量差异、位号缺失/多出、重复位号及归属冲突。
@@ -50,10 +52,10 @@
 
 从 [GitHub Releases](https://github.com/Marginal-Z/SMT-CHECK/releases/latest) 直接下载当前版本安装包：
 
-- **Windows x64：`SMT-CHECK-Setup-x64.exe`**。运行安装向导，选择安装目录（可选择 D 盘）；安装完成后从开始菜单启动 SMT-CHECK，可在系统“已安装的应用”中卸载。安装程序自动管理全部运行库和资源，无需解压或手动维护文件。安装向导也提供中、英、泰语言选择。
+- **Windows x64：`SMT-CHECK-Setup-x64.exe`**。运行安装向导，选择安装目录（可选择 D 盘）；安装完成后从开始菜单启动 SMT Fusion，可在系统“已安装的应用”中卸载。安装程序自动管理全部运行库和资源，无需解压或手动维护文件。安装向导也提供中、英、泰语言选择。
 - **Windows ARM64：`SMT-CHECK-Setup-arm64.exe`**。用于 ARM64 Windows 11 设备，原生运行；安装方法同 x64。
 - **macOS Intel / Apple Silicon：`SMT-CHECK-macos-universal.dmg`**。macOS 12+ 通用安装镜像，打开后将单个 SMT-CHECK.app 拖到 Applications。应用为临时签名，未进行 Apple Developer ID 签名或公证；系统首次阻止启动时需在“系统设置 → 隐私与安全性”允许打开。
-- **Ubuntu / Debian x64 / ARM64：`SMT-CHECK-linux-amd64.deb` / `SMT-CHECK-linux-arm64.deb`**。按设备架构选择，通过系统软件安装器打开，安装后在应用菜单启动 SMT-CHECK。
+- **Ubuntu / Debian x64 / ARM64：`SMT-CHECK-linux-amd64.deb` / `SMT-CHECK-linux-arm64.deb`**。按设备架构选择，通过系统软件安装器打开，安装后在应用菜单启动 SMT Fusion。
 
 软件本地核对不依赖 Excel、Python 或 AI 服务。当前 Windows 安装程序尚未进行代码签名。
 
@@ -68,12 +70,12 @@
 
 ## 下载 GitHub 构建
 
-正式下载入口是上面的 Releases，提供直接下载的 EXE / DEB / DMG 安装文件。开发构建也会保存在 [多平台构建列表](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml) 的 **Artifacts** 中，保留 30 天；手动点击 **Run workflow** 或向 `main` 推送源码可生成新的构建。
+正式下载入口是上面的 Releases，提供直接下载的 EXE / DEB / DMG / PKG 安装文件。开发构建也会保存在 [多平台构建列表](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml) 的 **Artifacts** 中，保留 30 天；手动点击 **Run workflow** 或向 `main` 推送源码可生成新的构建。
 
 - `SMT-CHECK-windows-x64`：包含 Windows EXE 安装程序与 SHA256 校验文件。
 - `SMT-CHECK-windows-arm64`、`SMT-CHECK-linux-arm64`：ARM64 原生安装包和 SHA256。
 - `SMT-CHECK-linux-x64`：Linux amd64 DEB 和 SHA256。
-- `SMT-CHECK-macos-universal`：同时包含 Intel / Apple Silicon 代码的 DMG 和 SHA256。
+- `SMT-CHECK-macos-universal`：同时包含 Intel / Apple Silicon 代码的 DMG、应用内更新 PKG 和 SHA256。
 
 Artifacts 是供开发验证的外层 ZIP；日常安装请直接使用 Releases 的安装文件。
 

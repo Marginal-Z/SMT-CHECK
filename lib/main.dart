@@ -1,8 +1,17 @@
 import 'package:flutter/widgets.dart';
 
 import 'app.dart';
+import 'services/preferences_migration.dart';
 
-void main(List<String> arguments) {
+Future<void> main(List<String> arguments) async {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(SmtCheckApp(arguments: arguments));
+  var migrationFailed = false;
+  try {
+    await migrateWindowsPreferences();
+  } catch (_) {
+    migrationFailed = true;
+  }
+  runApp(
+    SmtCheckApp(arguments: arguments, settingsMigrationFailed: migrationFailed),
+  );
 }

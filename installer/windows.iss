@@ -1,5 +1,5 @@
 #ifndef AppVersion
-#define AppVersion "1.12.0"
+#define AppVersion "1.13.0"
 #endif
 #ifndef AppArchitecture
   #define AppArchitecture "x64"
@@ -10,12 +10,13 @@
 
 [Setup]
 AppId={{C0CD984F-2F4E-4C4F-A7B7-8069C079542D}
-AppName=SMT-CHECK
+AppName=SMT Fusion
 AppVersion={#AppVersion}
 AppPublisher=Marginal-Z
 AppPublisherURL=https://github.com/Marginal-Z/SMT-CHECK
 DefaultDirName={localappdata}\Programs\SMT-CHECK
-DefaultGroupName=SMT-CHECK
+DefaultGroupName=SMT Fusion
+UsePreviousGroup=no
 PrivilegesRequired=lowest
 DisableProgramGroupPage=yes
 OutputDir=..\dist
@@ -51,8 +52,19 @@ Name: "desktopicon"; Description: "Create a desktop shortcut"; Flags: unchecked
 Source: "{#PayloadDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\SMT-CHECK"; Filename: "{app}\SMT-CHECK.exe"; WorkingDir: "{app}"
-Name: "{autodesktop}\SMT-CHECK"; Filename: "{app}\SMT-CHECK.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+Name: "{group}\SMT Fusion"; Filename: "{app}\SMT-CHECK.exe"; WorkingDir: "{app}"
+Name: "{autodesktop}\SMT Fusion"; Filename: "{app}\SMT-CHECK.exe"; WorkingDir: "{app}"; Tasks: desktopicon
+
+[InstallDelete]
+Type: files; Name: "{userprograms}\SMT-CHECK\SMT-CHECK.lnk"
+Type: files; Name: "{autodesktop}\SMT-CHECK.lnk"
 
 [Run]
-Filename: "{app}\SMT-CHECK.exe"; Description: "Launch SMT-CHECK"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\SMT-CHECK.exe"; Description: "Launch SMT Fusion"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\SMT-CHECK.exe"; Flags: nowait skipifnotsilent; Check: IsFusionUpdate
+
+[Code]
+function IsFusionUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:SMTFUSIONUPDATE|0}') <> '0';
+end;

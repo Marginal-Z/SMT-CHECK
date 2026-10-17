@@ -23,5 +23,32 @@ mkdir -p "$task_root/dist"
 stage="$(mktemp -d "$task_root/dist/dmg-stage.XXXXXX")"
 ditto "$app" "$stage/SMT-CHECK.app"
 ln -s /Applications "$stage/Applications"
-hdiutil create -volname SMT-CHECK -srcfolder "$stage" -ov -format UDZO "$task_root/dist/SMT-CHECK-macos-universal.dmg"
+hdiutil create -volname 'SMT Fusion' -srcfolder "$stage" -ov -format UDZO "$task_root/dist/SMT-CHECK-macos-universal.dmg"
 (cd "$task_root/dist" && shasum -a 256 SMT-CHECK-macos-universal.dmg > SMT-CHECK-macos-universal.dmg.sha256)
+# Native system-installer payload for in-app updates. The bundle identifier and
+# existing /Applications/SMT-CHECK.app location remain stable across the rename.
+pkg_stage="$(mktemp -d "$task_root/dist/pkg-stage.XXXXXX")"
+ditto "$app" "$pkg_stage/SMT-CHECK.app"
+components="$task_root/dist/pkg-components.plist"
+pkgbuild --analyze --root "$pkg_stage" "$components"
+python3 - "$components" <<'PY'
+import plistlib, sys
+path = sys.argv[1]
+with open(path, 'rb') as stream:
+    components = plistlib.load(stream)
+def fixed_location(value):
+    if isinstance(value, dict):
+        if 'BundleIsRelocatable' in value:
+            value['BundleIsRelocatable'] = False
+        for child in value.values():
+            fixed_location(child)
+    elif isinstance(value, list):
+        for child in value:
+            fixed_location(child)
+fixed_location(components)
+with open(path, 'wb') as stream:
+    plistlib.dump(components, stream)
+PY
+version="$(sed -n 's/^version: *\([^+ ]*\).*/\1/p' pubspec.yaml)"
+pkgbuild --root "$pkg_stage" --component-plist "$components" --identifier com.smtcheck.smtCheck --version "$version" --install-location /Applications "$task_root/dist/SMT-Fusion-macos-universal.pkg"
+(cd "$task_root/dist" && shasum -a 256 SMT-Fusion-macos-universal.pkg > SMT-Fusion-macos-universal.pkg.sha256)

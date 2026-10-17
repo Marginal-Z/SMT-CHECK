@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show AppExitType;
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -18,6 +19,7 @@ import 'services/ai_findings.dart';
 import 'services/report_export.dart';
 import 'services/source_analysis.dart';
 import 'services/update_service.dart';
+import 'services/update_installer.dart';
 import 'ui/design.dart';
 import 'ui/results.dart';
 import 'ui/localized_text.dart';
@@ -34,6 +36,7 @@ import 'l10n/localization.dart';
 class SmtCheckApp extends StatefulWidget {
   final List<String> arguments;
   final bool persist;
+  final bool settingsMigrationFailed;
   final CheckReport? initialReport;
   final String initialLanguage;
   final ThemeAccent initialAccent;
@@ -49,7 +52,8 @@ class SmtCheckApp extends StatefulWidget {
   final AiService Function()? aiServiceFactory;
   final UpdateService Function()? updateServiceFactory;
   final Future<String> Function()? installedVersionLoader;
-  final Future<bool> Function(Uri)? externalUrlLauncher;
+  final UpdateInstaller? updateInstaller;
+  final Future<void> Function()? updateQuit;
   final Future<SourceAnalysisPlan> Function(
     ImportedFile,
     List<ImportedFile>,
@@ -61,6 +65,7 @@ class SmtCheckApp extends StatefulWidget {
     super.key,
     this.arguments = const [],
     this.persist = true,
+    this.settingsMigrationFailed = false,
     this.initialReport,
     this.initialLanguage = 'zh',
     this.initialAccent = ThemeAccent.black,
@@ -70,7 +75,8 @@ class SmtCheckApp extends StatefulWidget {
     this.aiServiceFactory,
     this.updateServiceFactory,
     this.installedVersionLoader,
-    this.externalUrlLauncher,
+    this.updateInstaller,
+    this.updateQuit,
     this.sourcePlanner,
   });
   @override
@@ -157,6 +163,9 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     if (widget.persist) {
       try {
         prefs = await SharedPreferences.getInstance();
+        if (prefs!.getBool('settingsMigrationFailed') == true) {
+          activity = '旧版设置迁移失败，原设置已保留，请检查文件权限。';
+        }
         dark = prefs!.getBool('dark') ?? false;
         accent =
             ThemeAccent.values
@@ -197,6 +206,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
       }
     }
     settingsLoaded = true;
+    if (widget.settingsMigrationFailed) activity = '旧版设置迁移失败，原设置已保留，请检查文件权限。';
     if (!mounted) return;
     setState(() {});
     if (widget.arguments.isNotEmpty) await importArguments();
@@ -1147,7 +1157,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
   @override
   Widget build(BuildContext context) => MaterialApp(
     navigatorKey: navigator,
-    title: 'SMT-CHECK',
+    title: 'SMT Fusion',
     debugShowCheckedModeBanner: false,
     theme: desktopTheme(dark, accent),
     locale: Locale(language),
@@ -1252,10 +1262,24 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
     try {
       await showDialog<void>(
         context: context,
+        barrierDismissible: true,
         builder: (_) => UpdateDialog(
           serviceFactory: widget.updateServiceFactory,
           versionLoader: widget.installedVersionLoader,
-          linkOpener: widget.externalUrlLauncher,
+          installer: widget.updateInstaller,
+          canInstall: () =>
+              !(busy ||
+                  aiBusy ||
+                  cadBusy ||
+                  mergeExportBusy ||
+                  coordinateCompare.busy),
+          onQuit:
+              widget.updateQuit ??
+              () async {
+                await ServicesBinding.instance.exitApplication(
+                  AppExitType.required,
+                );
+              },
         ),
       );
     } finally {
@@ -1615,7 +1639,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'SMT-CHECK',
+                    'SMT Fusion',
                     style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
                   ),
                   const SizedBox(height: 12),
@@ -1631,7 +1655,7 @@ class _SmtCheckAppState extends State<SmtCheckApp> {
                     onPressed: () => unawaited(checkUpdates(context)),
                   ),
                   const SizedBox(height: 12),
-                  caption(context, '在系统浏览器中下载完整安装包。'),
+                  caption(context, '在软件内下载并校验安装包，无需打开发布页面。'),
                 ],
               ),
             ),

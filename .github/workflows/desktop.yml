@@ -51,7 +51,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb xauth libgl1-mesa-dri libegl1 libgles2
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev xvfb xauth libgl1-mesa-dri libegl1 libgles2 policykit-1
 
       - name: Set up Flutter
         if: matrix.arch != 'arm64'
@@ -118,13 +118,26 @@ jobs:
           $expectedVersion = ((Get-Content pubspec.yaml | Where-Object { $_ -match '^version:' }) -replace '^version:\s*','') -split '\+'
           $installedVersion = ((Get-Item -LiteralPath $exe).VersionInfo.ProductVersion.Trim() -split '\+')[0]
           if ($installedVersion -ne $expectedVersion[0]) { throw 'Installed application version mismatch' }
+          if ((Get-Item -LiteralPath $exe).VersionInfo.ProductName -ne 'SMT Fusion') { throw 'Product display name mismatch' }
+          $legacyPrefs = Join-Path $env:APPDATA 'com.smtcheck/SMT-CHECK/shared_preferences.json'
+          $fusionPrefs = Join-Path $env:APPDATA 'com.smtcheck/SMT Fusion/shared_preferences.json'
+          New-Item -ItemType Directory -Path (Split-Path $legacyPrefs) -Force | Out-Null
+          '{"flutter.language":"th","flutter.accentColor":"green"}' | Set-Content -LiteralPath $legacyPrefs -Encoding utf8NoBOM
           $process = Start-Process -FilePath $exe -WorkingDirectory $installDir -PassThru -WindowStyle Hidden
           try {
             Start-Sleep -Seconds 10
             if ($process.HasExited) { throw "Application exited during startup with code $($process.ExitCode)" }
+            if (-not (Test-Path -LiteralPath $fusionPrefs)) { throw 'Legacy preferences were not migrated' }
+            if ((Get-Content -LiteralPath $fusionPrefs -Raw | ConvertFrom-Json).'flutter.language' -ne 'th') { throw 'Migrated language mismatch' }
           } finally {
             if (-not $process.HasExited) { Stop-Process -Id $process.Id }
           }
+          $update = Start-Process -FilePath (Resolve-Path '${{ matrix.package }}').Path -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/SMTFUSIONUPDATE=1',"/DIR=$installDir" -Wait -PassThru -WindowStyle Hidden
+          if ($update.ExitCode -ne 0) { throw 'In-place update failed' }
+          Start-Sleep -Seconds 10
+          $restarted = @(Get-Process -Name 'SMT-CHECK' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
+          if ($restarted.Count -ne 1) { throw 'Update did not restart the installed app exactly once' }
+          $restarted | Stop-Process
           $uninstaller = Start-Process -FilePath (Join-Path $installDir 'unins000.exe') -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART' -Wait -PassThru -WindowStyle Hidden
           if ($uninstaller.ExitCode -ne 0 -or (Test-Path -LiteralPath $exe)) { throw 'Application uninstall failed' }
 
@@ -168,7 +181,9 @@ jobs:
 
       - name: Install, launch and uninstall macOS application
         if: runner.os == 'macOS'
-        run: bash tools/smoke-macos.sh '${{ matrix.package }}'
+        run: |
+          bash tools/smoke-macos.sh '${{ matrix.package }}'
+          bash tools/smoke-macos-pkg.sh dist/SMT-Fusion-macos-universal.pkg
 
       - name: Upload desktop package
         uses: actions/upload-artifact@v7.0.2
@@ -177,6 +192,7 @@ jobs:
           path: |
             ${{ matrix.package }}
             ${{ matrix.package }}.sha256
+            dist/SMT-Fusion-macos-universal.pkg*
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
@@ -196,4 +212,6 @@ jobs:
       - name: Verify checksum
         run: (cd dist && shasum -a 256 -c SMT-CHECK-macos-universal.dmg.sha256)
       - name: Install, launch and uninstall macOS application
-        run: bash tools/smoke-macos.sh dist/SMT-CHECK-macos-universal.dmg
+        run: |
+          bash tools/smoke-macos.sh dist/SMT-CHECK-macos-universal.dmg
+          bash tools/smoke-macos-pkg.sh dist/SMT-Fusion-macos-universal.pkg

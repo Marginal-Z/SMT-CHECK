@@ -19,7 +19,7 @@ Map<String, dynamic> releaseData({String tag = 'v1.10.0'}) => {
       'SMT-CHECK-linux-arm64.deb',
       'SMT-CHECK-macos-universal.dmg',
     ])
-      {
+      <String, dynamic>{
         'name': name,
         'state': 'uploaded',
         'size': 1234,
@@ -36,6 +36,54 @@ UpdateService serviceFor(Map<String, dynamic> data) => UpdateService(
 );
 
 void main() {
+  test('Fusion release retains legacy Windows name and prefers native macOS PKG with SHA-256', () async {
+    final data = releaseData(tag: 'v1.13.0');
+    for (final asset in data['assets'] as List) {
+      asset['digest'] = 'sha256:${'a' * 64}';
+    }
+    (data['assets'] as List).add({
+      'name': 'SMT-Fusion-macos-universal.pkg',
+      'state': 'uploaded',
+      'size': 2345,
+      'digest': 'sha256:${'b' * 64}',
+      'browser_download_url':
+          '$releaseRepository/releases/download/v1.13.0/SMT-Fusion-macos-universal.pkg',
+    });
+    final service = serviceFor(data);
+    addTearDown(service.close);
+    final windows = await service.check(
+      currentVersion: '1.12.0',
+      platform: 'windows',
+      architecture: 'x64',
+    );
+    expect(windows.installer!.pathSegments.last, 'SMT-CHECK-Setup-x64.exe');
+    expect(windows.canInstall, true);
+    expect(windows.sha256, 'a' * 64);
+    final mac = await service.check(
+      currentVersion: '1.12.0',
+      platform: 'macos',
+      architecture: 'arm64',
+    );
+    expect(mac.installer!.pathSegments.last, 'SMT-Fusion-macos-universal.pkg');
+    expect(mac.canInstall, true);
+    expect(mac.installerSize, 2345);
+    expect(mac.sha256, 'b' * 64);
+  });
+  test('missing or malformed hash disables in-app execution but still reports the new version', () async {
+    for (final digest in [null, '', 'sha256:invalid', 'sha256:${'x' * 64}']) {
+      final data = releaseData();
+      (data['assets'] as List).first['digest'] = digest;
+      final service = serviceFor(data);
+      addTearDown(service.close);
+      final value = await service.check(
+        currentVersion: '1.0.0',
+        platform: 'windows',
+        architecture: 'x64',
+      );
+      expect(value.hasUpdate, true);
+      expect(value.canInstall, false);
+    }
+  });
   test(
     'installed local 1.11.0 can discover the published 1.11.1 installer',
     () async {
