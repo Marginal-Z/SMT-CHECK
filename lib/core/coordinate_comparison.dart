@@ -227,6 +227,17 @@ class CoordinateComparison {
       .fold(0, (n, i) => n + i.b.length);
   int count(CadDifferenceType type) =>
       items.where((i) => i.differences.any((d) => d.type == type)).length;
+  bool reviewPending(CoordinateDifferenceItem item) =>
+      !decisions.containsKey(item) &&
+      [...item.a, ...item.b]
+          .expand(settings.classify)
+          .any((rule) => rule.action != SpecialAction.retain);
+  String displayStatus(CoordinateDifferenceItem item) =>
+      decisions[item]?.excluded == true
+      ? '已排除物料'
+      : reviewPending(item)
+      ? '待人工确认'
+      : item.status;
   int specialCount(bool sideA) => (sideA ? a : b).records
       .where((r) => settings.classify(r).isNotEmpty)
       .length;

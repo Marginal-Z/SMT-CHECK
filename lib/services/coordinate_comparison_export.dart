@@ -51,6 +51,8 @@ Map<String, Object?> coordinateComparisonJson(CoordinateComparison r) {
         {
           'reference': item.reference,
           'status': item.status,
+          'reviewPending': r.reviewPending(item),
+          'excluded': r.decisions[item]?.excluded ?? false,
           'special': item.special,
           'a': item.a.map(source).toList(),
           'b': item.b.map(source).toList(),

@@ -15,6 +15,8 @@ import '../services/coordinate_comparison_export.dart';
 import 'design.dart';
 import 'localized_text.dart';
 
+enum CoordinateResultPool { active, excluded, all }
+
 /// Retained by the application across navigation. Async work owns no widget State.
 class CoordinateCompareController extends ChangeNotifier {
   CoordinateImport? a, b;
@@ -28,6 +30,7 @@ class CoordinateCompareController extends ChangeNotifier {
   int _epoch = 0;
   String error = '', query = '';
   CadDifferenceType? filter;
+  CoordinateResultPool pool = CoordinateResultPool.active;
   CoordinateCompareController({
     this.settings = const CoordinateCompareSettings(),
     this.loader = readComparisonCoordinatesInBackground,
@@ -40,6 +43,7 @@ class CoordinateCompareController extends ChangeNotifier {
     _epoch++;
     result = null;
     selected = null;
+    pool = CoordinateResultPool.active;
     error = '';
     busy = false;
     _emit();
@@ -54,6 +58,7 @@ class CoordinateCompareController extends ChangeNotifier {
     query = '';
     filter = null;
     onlyErrors = false;
+    pool = CoordinateResultPool.active;
     invalidate();
   }
 
@@ -89,6 +94,7 @@ class CoordinateCompareController extends ChangeNotifier {
     confirmed = false;
     result = null;
     selected = null;
+    pool = CoordinateResultPool.active;
     busy = true;
     error = '';
     _emit();
@@ -122,6 +128,7 @@ class CoordinateCompareController extends ChangeNotifier {
     error = '';
     result = null;
     selected = null;
+    pool = CoordinateResultPool.active;
     _emit();
     try {
       final next = await compareCoordinatesInBackground(
@@ -189,15 +196,21 @@ class _CoordinateComparisonWorkspaceState
   }
 
   Future<void> import(bool sideA) async {
+    final controller = c, epoch = c._epoch;
     try {
       final file = await openFile(
         acceptedTypeGroups: [
           const XTypeGroup(label: 'CAD', extensions: ['xlsx', 'csv', 'txt']),
         ],
       );
-      if (file != null && mounted) await c.load(file.path, sideA);
+      if (file != null &&
+          mounted &&
+          identical(c, controller) &&
+          epoch == controller._epoch) {
+        await controller.load(file.path, sideA);
+      }
     } catch (e) {
-      if (mounted) {
+      if (mounted && identical(c, controller) && epoch == controller._epoch) {
         c.error = '坐标比较失败：$e';
         c.changed();
       }
@@ -262,6 +275,9 @@ class _CoordinateComparisonWorkspaceState
             r?.items
                 .where(
                   (i) =>
+                      (c.pool == CoordinateResultPool.all ||
+                          (r.decisions[i]?.excluded == true) ==
+                              (c.pool == CoordinateResultPool.excluded)) &&
                       (!c.onlyErrors || i.isError) &&
                       (c.filter == null ||
                           i.differences.any((d) => d.type == c.filter)) &&
@@ -271,7 +287,7 @@ class _CoordinateComparisonWorkspaceState
                 )
                 .toList() ??
             [];
-        final selected = c.selected;
+        final selected = rows.contains(c.selected) ? c.selected : null;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -405,6 +421,7 @@ class _CoordinateComparisonWorkspaceState
                       LText(c.error, style: TextStyle(color: p.alertText)),
                     if (r != null) ...[
                       const SizedBox(height: 10),
+                      const LText('原始文件差异统计'),
                       Wrap(
                         spacing: 8,
                         runSpacing: 8,
@@ -475,6 +492,25 @@ class _CoordinateComparisonWorkspaceState
                         runSpacing: 8,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
+                          for (final entry in [
+                            (CoordinateResultPool.active, '核对结果'),
+                            (CoordinateResultPool.excluded, '已排除物料'),
+                            (CoordinateResultPool.all, '全部'),
+                          ])
+                            DeskButton(
+                              entry.$2,
+                              key: ValueKey('coordinate-pool-${entry.$1.name}'),
+                              variant: DeskButtonVariant.segment,
+                              selected: c.pool == entry.$1,
+                              onPressed: () {
+                                c.pool = entry.$1;
+                                if (c.pool == CoordinateResultPool.excluded) {
+                                  c.filter = null;
+                                  c.onlyErrors = false;
+                                }
+                                c.changed();
+                              },
+                            ),
                           SizedBox(
                             width: math.min(240, constraints.maxWidth - 50),
                             child: TextField(
@@ -715,10 +751,14 @@ class _CoordinateComparisonWorkspaceState
                     itemBuilder: (context, index) {
                       final item = rows[index],
                           chosen = identical(c.selected, item);
-                      final color = p.result(
-                        item.isError ? CheckStatus.error : CheckStatus.pass,
-                      );
                       final decision = c.result?.decisions[item];
+                      final color = p.result(
+                        item.isError || decision?.excluded == true
+                            ? CheckStatus.error
+                            : CheckStatus.pass,
+                      );
+                      final status =
+                          c.result?.displayStatus(item) ?? item.status;
                       String coords(CoordinateRecord? row) => row == null
                           ? '—'
                           : '${row.xText} / ${row.yText} / ${row.angleText}°';
@@ -736,7 +776,7 @@ class _CoordinateComparisonWorkspaceState
                             ? '${item.b.length} ×'
                             : coords(item.b.firstOrNull),
                         item.differences.isEmpty
-                            ? localText(context, item.status)
+                            ? localText(context, status)
                             : item.differences
                                   .map((d) => localText(context, d.type.label))
                                   .toSet()
@@ -749,10 +789,14 @@ class _CoordinateComparisonWorkspaceState
                             .join('\n'),
                         decision?.excluded == true
                             ? localText(context, '已排除物料')
-                            : localText(context, item.status),
+                            : localText(context, status),
                       ];
                       return Material(
-                        color: item.numericPending && !item.isError
+                        color:
+                            (item.numericPending ||
+                                    c.result?.reviewPending(item) == true) &&
+                                !item.isError &&
+                                decision?.excluded != true
                             ? p.hover
                             : color.fill,
                         child: InkWell(
@@ -876,6 +920,13 @@ class _ComparisonDetailState extends State<_ComparisonDetail> {
       void decide(bool exclude) {
         try {
           r?.decide(item, exclude, reason.text);
+          widget.controller.pool = exclude
+              ? CoordinateResultPool.excluded
+              : CoordinateResultPool.active;
+          if (exclude) {
+            widget.controller.filter = null;
+            widget.controller.onlyErrors = false;
+          }
           setState(() => error = '');
           widget.controller.changed();
         } on FormatException catch (e) {
@@ -893,10 +944,14 @@ class _ComparisonDetailState extends State<_ComparisonDetail> {
               style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
             ),
             LText(
-              item.status,
+              r?.displayStatus(item) ?? item.status,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                color: item.isError ? p.alertText : good,
+                color: item.isError || decision?.excluded == true
+                    ? p.alertText
+                    : r?.reviewPending(item) == true
+                    ? p.muted
+                    : good,
               ),
             ),
             if (item.numericPending)

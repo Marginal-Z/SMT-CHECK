@@ -11,6 +11,39 @@ import 'support/cad_fixture.dart';
 import 'coordinate_comparison_test.dart' show record;
 
 void main() {
+  test(
+    'review rules stay pending until explicit retain or exclude decisions',
+    () {
+      final s = CoordinateCompareSettings(
+        specialRules: [
+          const SpecialRule(
+            'TP',
+            reference: 'TP[0-9]+',
+            action: SpecialAction.review,
+          ),
+        ],
+      );
+      final r = CoordinateComparator.compare(
+        CoordinateImport('A', [record('TP1')], []),
+        CoordinateImport('B', [record('TP1')], []),
+        s,
+        unitA: CadUnit.mm,
+        unitB: CadUnit.mm,
+        frameConfirmed: true,
+      );
+      final item = r.items.single;
+      expect(item.status, 'PASS');
+      expect(r.reviewPending(item), true);
+      expect(r.displayStatus(item), '待人工确认');
+      r.decide(item, true, 'not in this process');
+      expect(r.reviewPending(item), false);
+      expect(r.displayStatus(item), '已排除物料');
+      expect(item.status, 'PASS');
+      r.decide(item, false, 'process changed');
+      expect(r.displayStatus(item), 'PASS');
+      expect(r.decisionHistory.length, 2);
+    },
+  );
   test('invalid panel member is quality data, not a false extra component', () {
     final dir = Directory.systemTemp.createTempSync('cad-panel-');
     addTearDown(() => dir.deleteSync(recursive: true));

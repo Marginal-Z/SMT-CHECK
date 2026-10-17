@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -15,6 +17,17 @@ import 'package:smt_check/ui/coordinate_compare_settings.dart';
 import 'package:smt_check/ui/design.dart';
 
 import 'coordinate_comparison_test.dart' as fixture;
+
+class DelayedCoordinateSelector extends FileSelectorPlatform {
+  final Completer<XFile?> selection;
+  DelayedCoordinateSelector(this.selection);
+  @override
+  Future<XFile?> openFile({
+    List<XTypeGroup>? acceptedTypeGroups,
+    String? initialDirectory,
+    String? confirmButtonText,
+  }) => selection.future;
+}
 
 CoordinateCompareController prepared() {
   final c = CoordinateCompareController();
@@ -40,6 +53,75 @@ CoordinateCompareController prepared() {
 }
 
 void main() {
+  testWidgets('clear rejects a late native file-picker selection', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1560, 980);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final previous = FileSelectorPlatform.instance,
+        pending = Completer<XFile?>();
+    FileSelectorPlatform.instance = DelayedCoordinateSelector(pending);
+    addTearDown(() => FileSelectorPlatform.instance = previous);
+    final c = CoordinateCompareController(
+      loader: (_) async =>
+          CoordinateImport('old.xlsx', [fixture.record('R1')], []),
+    );
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: desktopTheme(false),
+        home: Scaffold(
+          body: CoordinateComparisonWorkspace(controller: c, onSettings: () {}),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('coordinate-import-a')));
+    await tester.pump();
+    c.clear();
+    pending.complete(XFile('old.xlsx'));
+    await tester.pumpAndSettle();
+    expect(c.a, isNull);
+    expect(c.busy, false);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets(
+    'manual exclusion has a separate visible pool and retains original NG',
+    (tester) async {
+      tester.view.physicalSize = const Size(1560, 980);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final c = prepared();
+      addTearDown(c.dispose);
+      final tp = c.result!.items.singleWhere((i) => i.reference == 'TP10_1');
+      c.result!.decide(tp, true, 'process decision');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: desktopTheme(false),
+          home: Scaffold(
+            body: CoordinateComparisonWorkspace(
+              controller: c,
+              onSettings: () {},
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('coordinate-row-0')), findsOneWidget);
+      expect(find.byKey(const ValueKey('coordinate-row-1')), findsNothing);
+      await tester.tap(find.byKey(const ValueKey('coordinate-pool-excluded')));
+      await tester.pumpAndSettle();
+      expect(find.text('TP10_1'), findsWidgets);
+      expect(c.result!.missing, 1);
+      expect(tp.isError, true);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const ValueKey('coordinate-pool-all')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('coordinate-row-1')), findsOneWidget);
+    },
+  );
   testWidgets(
     'generated diagnostics translate while Excel field values stay literal',
     (tester) async {

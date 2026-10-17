@@ -75,6 +75,11 @@ const coordinateCompareCatalog = <String, List<String>>{
   '差异数值': ['Difference values', 'ค่าความแตกต่าง'],
   '检测结果': ['Result', 'ผลตรวจสอบ'],
   '待确认': ['Pending confirmation', 'รอการยืนยัน'],
+  '核对结果': ['Results', 'ผลการตรวจสอบ'],
+  '原始文件差异统计': [
+    'Original file difference statistics',
+    'สถิติความแตกต่างของไฟล์ต้นฉบับ',
+  ],
   '可能为 PCB 特殊特征。默认保留；排除不删除记录，也不改变原始差异。': [
     'Possible special PCB feature. Kept by default. Excluding retains source records and original differences.',
     'อาจเป็นคุณลักษณะ PCB พิเศษ เก็บไว้โดยค่าเริ่มต้น การยกเว้นไม่ลบข้อมูลหรือเปลี่ยนความแตกต่างเดิม',
