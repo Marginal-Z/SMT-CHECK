@@ -132,7 +132,8 @@ jobs:
           } finally {
             if (-not $process.HasExited) { Stop-Process -Id $process.Id }
           }
-          $update = Start-Process -FilePath (Resolve-Path '${{ matrix.package }}').Path -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/SMTFUSIONUPDATE=1',"/DIR=$installDir" -Wait -PassThru -WindowStyle Hidden
+          $update = Start-Process -FilePath (Resolve-Path '${{ matrix.package }}').Path -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/SP-','/SMTFUSIONUPDATE=1',"/DIR=$installDir" -PassThru -WindowStyle Hidden
+          if (-not $update.WaitForExit(120000)) { throw 'In-place installer did not finish within two minutes' }
           if ($update.ExitCode -ne 0) { throw 'In-place update failed' }
           Start-Sleep -Seconds 10
           $restarted = @(Get-Process -Name 'SMT-CHECK' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })

@@ -7,13 +7,15 @@ cd "$task_root"
 app=/Applications/SMT-CHECK.app
 [[ ! -e "$app" ]] || { echo 'Refusing to overwrite an existing application.' >&2; exit 1; }
 legacy="$HOME/Library/Containers/com.smtcheck.smtCheck/Data/Library/Preferences/com.smtcheck.smtCheck.plist"
+# Clear the new app domain BEFORE creating the legacy fixture. `defaults` may
+# resolve a bundle ID to a legacy container as soon as that plist exists.
+defaults delete com.smtcheck.smtCheck >/dev/null 2>&1 || true
 mkdir -p "$(dirname "$legacy")"
 python3 - "$legacy" <<'PY'
 import plistlib, sys
 with open(sys.argv[1], 'wb') as stream:
     plistlib.dump({'flutter.language': 'th', 'flutter.accentColor': 'green'}, stream)
 PY
-defaults delete com.smtcheck.smtCheck >/dev/null 2>&1 || true
 sudo /usr/sbin/installer -pkg "$1" -target /
 expected="$(sed -n 's/^version: *\([^+ ]*\).*/\1/p' pubspec.yaml)"
 test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$expected"
@@ -26,13 +28,18 @@ trap 'kill "$app_pid" 2>/dev/null || true' EXIT
 sleep 15
 kill -0 "$app_pid"
 python3 tools/check_startup_log.py "$log" --allow-startup-frame-clamp
-test "$(defaults read com.smtcheck.smtCheck flutter.language)" = th
-test "$(defaults read com.smtcheck.smtCheck flutter.accentColor)" = green
+python3 - "$legacy" "$HOME/Library/Preferences/com.smtcheck.smtCheck.plist" <<'PY'
+import plistlib, sys
+for path in sys.argv[1:]:
+    with open(path, 'rb') as stream:
+        settings = plistlib.load(stream)
+    assert settings.get('flutter.language') == 'th', (path, 'language migration failed')
+    assert settings.get('flutter.accentColor') == 'green', (path, 'theme migration failed')
+PY
 kill "$app_pid"
 wait "$app_pid" || true
 trap - EXIT
 # This fixed path was absent before this script installed the package.
 sudo rm -rf -- /Applications/SMT-CHECK.app
 test ! -e "$app"
-rm -- "$legacy"
-defaults delete com.smtcheck.smtCheck
+rm -- "$legacy" "$HOME/Library/Preferences/com.smtcheck.smtCheck.plist"
