@@ -1,0 +1,42 @@
+name: Publish official website
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Verify website
+        run: node --test website/check.mjs
+      - uses: actions/configure-pages@v6.0.0
+      - name: Stage public files
+        run: |
+          mkdir -p _site
+          cp website/*.html website/*.css website/content.js website/site.js _site/
+          cp -R website/assets _site/assets
+          touch _site/.nojekyll
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: _site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5.0.1

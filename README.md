@@ -2,7 +2,7 @@
 
 [![Windows and Linux builds](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml/badge.svg)](https://github.com/Marginal-Z/SMT-CHECK/actions/workflows/desktop.yml)
 
-[官网与下载](https://smt-fusion-desktop.yy19273767397472432.chatgpt.site/) · [中文 / English / ไทย 使用教程](https://smt-fusion-desktop.yy19273767397472432.chatgpt.site/guide.html)
+[官网与下载](https://marginal-z.github.io/SMT-CHECK/) · [中文 / English / ไทย 使用教程](https://marginal-z.github.io/SMT-CHECK/guide.html)
 
 1.14 更新：Windows 安装包、快捷方式和任务栏统一使用独立版本图标与应用标识，安装时修复本应用旧快捷方式；设置 → 关于与更新提供“刷新桌面图标”。保留已存在的桌面快捷方式。工作台集中展示统计，AI 与合并只保留顶部入口，CSV / JSON 合并为一个导出菜单；窄窗口详情通过对话框展示，过滤掉选中项时隐藏旧详情。帮助页可打开三语官网与完整教程。官网源文件位于 [website](website/README.md)。
 

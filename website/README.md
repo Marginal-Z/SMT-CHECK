@@ -1,13 +1,23 @@
 # SMT Fusion 官网与教程
 
-公开地址：https://smt-fusion-desktop.yy19273767397472432.chatgpt.site/
+官网：https://marginal-z.github.io/SMT-CHECK/
+教程：https://marginal-z.github.io/SMT-CHECK/guide.html
+语言：`?lang=zh`、`?lang=en`、`?lang=th`。
 
-三语教程：`/guide.html?lang=zh`、`?lang=en`、`?lang=th`。
+## 维护与部署
 
-纯静态 HTML / CSS / JavaScript，无构建依赖。`content.js` 维护中英泰文本；`site.js` 渲染页面、保存语言偏好及执行本地教程搜索。六个下载链接直接指向 GitHub 最新正式安装包。可选 GitHub 版本查询超时不影响下载。页面不收集 Excel、AI 密钥或分析数据，无上传入口或追踪脚本。演示图由真实 Flutter 界面和合成测试数据渲染。
+HTML / CSS / JavaScript 静态网站，无构建依赖。`content.js` 维护中英泰三语文案；`site.js` 渲染首页与 13 章教程、语言切换及本地搜索。Pages 项目路径下的链接、图片及字体均使用相对路径。
 
-WSL Ubuntu（安装 Node.js 时）：`node --test website/check.mjs`；本地预览：`python3 -m http.server 8175 --bind 127.0.0.1 --directory website`。
+`.github/workflows/pages.yml` 在 main 分支 website/ 变化后执行检查、复制公开文件、上传 Pages artifact 并部署。通过 GitHub Pages 的公开网址访问，不依赖任何开发机服务。发布目录不包含检查脚本、说明文件或用户原始样本。
 
-发布通过 Sites source helper 将本目录的静态文件复制到独立 Site 仓库 `dist/`，推送并打包同一提交，再保存版本和部署。Site ID 为 `appgprj_6ad37142dca0819187d250ccc92cf9c5`，不要重复创建。凭据仅通过 helper 标准输入传递，不得保存在仓库。`check.mjs` 和本说明不需放入公开静态目录。
+WSL Ubuntu 执行：`node --test website/check.mjs`。仅用于本地验收的预览：`python3 -m http.server 8176 --bind 127.0.0.1 --directory website`。
 
-Noto Sans Thai 的 OFL 许可位于 assets。保留现有应用图标素材，不将原图中的设备品牌视为官方背书。
+## 素材与内容
+
+- `assets/hero-production.png` 是独立生成的宽幅工业工作流概念图，不是放大的应用图标，也不是设备实拍或软件检测结果。
+- workbench / merge 三语配图由真实 Flutter 页面和合成样例生成，不含生产数据。
+- 应用图标仅用于导航栏及 favicon。Manrope 与 Noto Sans Thai 字体的 OFL 许可随 assets 保留。
+- 六个下载链接直达 GitHub 最新正式版本安装包。版本提示查询失败不影响下载。
+- 教程只包括准备、操作、判读、输出和使用问题，不包含图标维护说明。AI 密钥、原始文件和生产数据不上传至网站。
+
+旧版客户端中保留的历史官网地址仅用于迁移跳转，不再作为官网内容维护来源。旧 Site ID `appgprj_6ad37142dca0819187d250ccc92cf9c5` 用于兼容重定向，不能重复注册。迁移时保留语言参数及教程锚点；公开内容以本仓库和 GitHub Pages 为准。
